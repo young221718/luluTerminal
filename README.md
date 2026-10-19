@@ -1,0 +1,48 @@
+# luluTerminal
+
+<img src="Resources/AppIcon.png" alt="올루루 부엉이 앱 아이콘" width="112" />
+
+Ghostty 기반 macOS 인프라 터미널의 첫 로컬 버전이다. 약 10대의 Linux 서버 자원을 한 화면에서 확인하고, SSH 계정별 tmux 작업을 다시 연다.
+현재 Mac은 목록 맨 위에 항상 표시한다. 처음 실행하면 로컬 Mac의 기본 셸 탭을 바로 사용할 수 있으며 기존 원격 서버 선택과 저장된 탭은 유지한다. 올루루 부엉이 아이콘과 네이비·민트 색상을 사용한다. 실행 가능한 초기 macOS 버전이며, 검사 방법과 지원 범위는 [검증 안내](docs/VERIFICATION.md)를 따른다.
+
+## 실행과 개발
+
+macOS 14+, Swift 6.2 이상이 필요하다. 검증 환경은 macOS 27.0.1 arm64, Swift 6.4 Command Line Tools다.
+첫 빌드는 GitHub에서 고정된 Ghostty XCFramework를 받으므로 네트워크가 필요하다. 엔진에는 arm64/x86_64 슬라이스가 있으며, 실제 실행 검증은 arm64에서 수행했다.
+
+```bash
+bash scripts/test.sh
+bash scripts/build-app.sh
+open 'dist/Infra Terminal.app'
+```
+
+가상 서버 10대와 실제 로컬 Mac을 구분해서 보는 데모는 `open -n 'dist/Infra Terminal.app' --args --demo`로 실행한다. 데모는 SSH를 실행하거나 실사용 저장 파일을 변경하지 않는다.
+로컬 Ghostty 셸 검증은 `open -n 'dist/Infra Terminal.app' --args --local-terminal`로 실행한다.
+핵심 타깃만 검사하려면 `INFRA_CORE_ONLY=1 bash scripts/test.sh --scratch-path .build-core`를 사용한다.
+
+검사 스크립트는 현재 CLT의 Swift Testing 프레임워크·매크로 플러그인 경로를 설정한다. 증분 빌드에서 플러그인이 누락되는 문제를 피하려고 폐기 예정인 native SwiftPM 빌드 모드를 사용한다. 향후 툴체인에서 기본 빌드 모드로 전환하는 검증이 필요하다.
+
+## 사용
+
+- **이 Mac**은 현재 로그인 이름과 로그인 셸을 사용한다. 로컬 탭을 선택하면 홈 디렉터리에서 셸을 시작하며 SSH를 실행하지 않는다. 로컬 항목은 일반 서버 편집으로 변경하거나 제거할 수 없다.
+- 로컬 탭은 전환할 때 기존 화면·셸을 유지하고 새 탭·닫기·다시 열기를 지원한다. 탭을 닫거나 앱을 종료한 뒤 다시 열면 새 셸을 시작하며 로컬 작업 지속을 보장하지 않는다.
+- 로컬 CPU·RAM·디스크는 macOS API로 수집한다. RAM은 active+inactive+wired+compressed 페이지 기준으로 회수 가능한 캐시를 포함하며 Activity Monitor와 계산 기준이 다르다. 디스크는 홈 디렉터리가 속한 단일 APFS 볼륨 용량이고 로컬 GPU·VRAM·네트워크 수집은 미지원이다.
+- 서버 이름, 호스트 또는 SSH 별칭, 포트, 로그인 계정과 모니터링 계정을 등록한다. 개인 키와 암호 원문은 앱에 저장하지 않으며 시스템 OpenSSH와 SSH agent를 사용한다.
+- 서버 목록은 CPU·RAM·디스크·GPU·VRAM 도넛을 표시한다. 중앙의 작은 보조색 숫자는 정수 사용률이며, 링은 낮은 사용량의 민트에서 높은 사용량의 노랑·주황·빨강으로 부드럽게 이어진다. 수집 불가 값은 `—`로 표시하며 0%와 구분한다. 단위와 수집 시각은 툴팁·자원 상세에서 확인한다.
+- 새 탭은 그 탭 전용 tmux 세션을 만든다. 탭에는 계정과 작업 이름을 표시하며, 서버별 선택 탭과 탭 순서·닫힌 기록을 저장한다.
+- 기존 탭의 재접속은 기존 세션만 연다. 비대화형 사전 확인이 실패하면 **터미널에서 인증하고 연결**을 선택할 수 있다. 호스트키와 계정 인증은 실제 SSH 터미널에서 처리한다.
+- 원격 세션이 없으면 자동으로 다시 만들지 않는다. 사용자가 **새 세션 만들기**를 선택해야 생성하며, 같은 세션이 이미 있으면 생성을 중단한다.
+- 탭 닫기·연결 해제는 로컬 연결만 닫는다. 원격 tmux 작업은 유지한다. 서버 재부팅이나 원격 프로세스 종료 후에는 작업 복원을 보장하지 않는다.
+- 모니터링은 비대화형 SSH 인증과 Linux `/proc`, `df`를 사용한다. NVIDIA GPU는 선택적으로 `nvidia-smi`를 사용한다. 목표 주기는 선택 서버 2초, 나머지 10초이며 동시 수집 상한은 3대다. 느린 응답에서는 실제 주기가 길어질 수 있다.
+- 지표 이력은 앱 실행 중 최근 15분만 표시한다. 앱을 다시 실행하거나 긴 공백이 생기면 이력을 이어 붙이지 않는다. Ansible은 비활성 예정 메뉴다.
+
+상태 파일은 `~/Library/Application Support/InfraTerminal/workspace-v1.json`에 저장한다. 연결 종류가 없는 기존 v1 프로필은 SSH로 읽는다. 손상 파일을 기본값으로 덮어쓰지 않으며 오류와 복구 경로를 표시한다. 기존 SSH 탭이 사용하는 계정 이름은 변경할 수 없으므로 다른 사용자는 새 계정으로 추가한다.
+
+동작 계약은 [SPEC](docs/SPEC.md), 작업 간 API는 [INTERFACES](docs/INTERFACES.md), 엔진 출처·라이선스는 [THIRD_PARTY](docs/THIRD_PARTY.md)에 기록했다.
+한국어 IME 조합 입력, VoiceOver, 네트워크 장애·장시간 수집은 추가 수락 검증 대상이다. 빌드한 앱은 ad-hoc 서명이며 Developer ID 서명·공증·자동 업데이트를 제공하지 않는다. 저장 데이터와 기존 앱 호환성을 위해 내부 실행파일·bundle 식별자·빌드 결과 경로는 InfraTerminal 이름을 유지한다.
+
+## 보안과 라이선스
+
+개인 키·비밀번호 원문과 실사용 서버 프로필은 저장소에 포함하지 않는다. SSH 인증은 사용자의 기존 OpenSSH 설정을 따른다. 설정된 원격 서버와 로컬 셸은 해당 사용자 권한으로 동작하므로 신뢰하는 대상만 연결한다. [보안 범위](SECURITY.md)를 참고한다.
+
+앱 코드와 올루루 자산에는 아직 별도 재사용 라이선스를 지정하지 않았다. Ghostty와 Swift 의존성의 MIT 고지는 [THIRD_PARTY](docs/THIRD_PARTY.md)에 정리하며 빌드한 앱에도 포함한다.

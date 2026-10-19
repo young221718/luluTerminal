@@ -1,0 +1,23 @@
+.build/
+.build-*/
+.swiftpm/
+.cache/
+dist/
+.DS_Store
+.superpowers/
+*.xcframework/
+
+# Local workspace instructions, design handoffs, and real-host evidence.
+/AGENTS.md
+/docs/VALIDATION.md
+/docs/design/
+/docs/superpowers/
+
+# Connection state and credentials must never be published.
+workspace-v1*.json
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx

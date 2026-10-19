@@ -1,0 +1,295 @@
+import Foundation
+import SwiftUI
+import InfraCore
+
+@MainActor
+public final class AppModel: ObservableObject {
+    @Published public private(set) var workspace = WorkspaceState()
+    @Published private(set) var metrics: [UUID: MetricsSnapshot] = [:]
+    @Published private(set) var histories: [UUID: [MetricsSnapshot]] = [:]
+    @Published private(set) var collectionErrors: [UUID: String] = [:]
+    @Published private(set) var connections: [UUID: ConnectionState] = [:]
+    @Published private(set) var persistenceError: String?
+    @Published private(set) var now = Date()
+    let isDemo: Bool
+    let storeURL: URL
+    private(set) var persistenceBlocked = false
+    private let store: StateStore
+    typealias CommandExecutor = @Sendable (ShellCommand, TimeInterval) async throws -> ProcessResult
+    private let execute: CommandExecutor
+    private var previous: [UUID: RawMetrics] = [:]
+    private var lastAttempts: [UUID: Date] = [:]
+    private var polls: [UUID: Task<Void, Never>] = [:]
+    private var connectionTokens: [UUID: UUID] = [:]
+    private var connectionChecks: [UUID: Task<ProcessResult, Error>] = [:]
+    private var scheduler: Task<Void, Never>?
+    private var lastDemoRefresh = Date.distantPast
+    private var localCollector = LocalMetricsCollector()
+
+    enum ConnectionState: Equatable {
+        case disconnected, checking, launched, missing, authenticationRequired(String), failed(String)
+        var label: String {
+            switch self {
+            case .disconnected: return "연결 해제"
+            case .checking: return "기존 세션 확인 중"
+            case .launched: return "터미널 연결 요청됨"
+            case .missing: return "기존 원격 세션 없음"
+            case .authenticationRequired(let message), .failed(let message): return message
+            }
+        }
+    }
+
+    public convenience init(demo: Bool = ProcessInfo.processInfo.arguments.contains("--demo"), storeURL: URL? = nil) {
+        self.init(demo: demo, storeURL: storeURL) { command, timeout in
+            try await ProcessRunner().run(command, timeout: timeout)
+        }
+    }
+
+    init(demo: Bool, storeURL: URL?, execute: @escaping CommandExecutor) {
+        self.isDemo = demo
+        self.execute = execute
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        self.storeURL = storeURL ?? support.appendingPathComponent("InfraTerminal/workspace-v1.json")
+        self.store = StateStore(url: self.storeURL)
+        if demo {
+            makeDemo()
+        } else {
+            do { workspace = try store.load() ?? WorkspaceState() }
+            catch {
+                persistenceBlocked = true
+                persistenceError = "저장 파일을 읽을 수 없습니다. 원본을 보존하고 저장을 중지했습니다. 복구 경로: \(self.storeURL.path)\n\(error.localizedDescription)"
+            }
+        }
+        workspace.ensureLocalMachine()
+    }
+
+    var selectedServer: ServerProfile? { workspace.servers.first { $0.id == workspace.selectedServerID } }
+    var selectedTab: TerminalTab? {
+        guard let id = workspace.selectedServerID, let tabID = workspace.selectedTabByServer[id] else { return nil }
+        return workspace.tabs.first { $0.id == tabID && !$0.isClosed && $0.serverID == id }
+    }
+    func tabs(for serverID: UUID, closed: Bool = false) -> [TerminalTab] {
+        workspace.tabs.filter { $0.serverID == serverID && $0.isClosed == closed }
+    }
+    func account(for tab: TerminalTab) -> SSHAccount? {
+        workspace.servers.first { $0.id == tab.serverID }?.accounts.first { $0.id == tab.accountID }
+    }
+    func selectServer(_ id: UUID) { workspace.select(serverID: id); persist() }
+    func selectTab(_ id: UUID) { workspace.select(tabID: id); persist() }
+    func closeTab(_ id: UUID) { workspace.close(tabID: id); disconnected(id); persist() }
+    func reopenTab(_ id: UUID) { workspace.reopen(tabID: id); persist() }
+    func disconnected(_ id: UUID) {
+        connectionTokens[id] = nil
+        connectionChecks.removeValue(forKey: id)?.cancel()
+        connections[id] = .disconnected
+    }
+
+    func saveProfile(_ profile: ServerProfile) throws {
+        guard profile.kind == .ssh, profile.id != LocalMachine.serverID else {
+            throw UIError.message("이 Mac은 기본 로컬 항목이므로 서버 편집으로 변경할 수 없습니다.")
+        }
+        try profile.validate()
+        if let index = workspace.servers.firstIndex(where: { $0.id == profile.id }) {
+            let old = workspace.servers[index]
+            for account in old.accounts where workspace.tabs.contains(where: { $0.serverID == old.id && $0.accountID == account.id }) {
+                guard profile.accounts.first(where: { $0.id == account.id })?.username == account.username else {
+                    throw UIError.message("열린 탭 또는 닫힌 탭이 사용하는 계정은 변경하거나 삭제할 수 없습니다. 새 계정을 추가하세요.")
+                }
+            }
+            workspace.servers[index] = profile
+            for tab in workspace.tabs where tab.serverID == profile.id { disconnected(tab.id) }
+            let oldMonitor = old.accounts.first { $0.id == old.monitorAccountID }?.username
+            let newMonitor = profile.accounts.first { $0.id == profile.monitorAccountID }?.username
+            if old.host != profile.host || old.port != profile.port || old.monitorAccountID != profile.monitorAccountID || oldMonitor != newMonitor {
+                previous[profile.id] = nil
+                lastAttempts[profile.id] = nil
+                metrics[profile.id] = nil
+                histories[profile.id] = nil
+                collectionErrors[profile.id] = nil
+            }
+            polls[profile.id]?.cancel()
+        } else {
+            workspace.servers.append(profile)
+            workspace.select(serverID: profile.id)
+        }
+        persist()
+    }
+
+    @discardableResult
+    func addTab(serverID: UUID, accountID: UUID, title: String) throws -> TerminalTab {
+        guard let server = workspace.servers.first(where: { $0.id == serverID }), server.accounts.contains(where: { $0.id == accountID }) else {
+            throw UIError.message("서버와 계정을 선택하세요.")
+        }
+        let tab = TerminalTab(serverID: serverID, accountID: accountID, title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "셸" : title)
+        try workspace.add(tab: tab)
+        persist()
+        return tab
+    }
+
+    func renameTab(_ id: UUID, title: String) {
+        let value = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, let index = workspace.tabs.firstIndex(where: { $0.id == id }) else { return }
+        workspace.tabs[index].title = value
+        persist()
+    }
+
+    func moveTab(_ id: UUID, by offset: Int) {
+        guard let index = workspace.tabs.firstIndex(where: { $0.id == id }) else { return }
+        let tab = workspace.tabs[index]
+        let siblings = workspace.tabs.indices.filter { workspace.tabs[$0].serverID == tab.serverID && !workspace.tabs[$0].isClosed }
+        guard let position = siblings.firstIndex(of: index), siblings.indices.contains(position + offset) else { return }
+        workspace.tabs.swapAt(index, siblings[position + offset])
+        persist()
+    }
+
+    func prepareConnection(tabID: UUID, create: Bool, probeExisting: Bool = true) async -> ShellCommand? {
+        guard let tab = workspace.tabs.first(where: { $0.id == tabID && !$0.isClosed }),
+              let server = workspace.servers.first(where: { $0.id == tab.serverID }), let account = account(for: tab) else { return nil }
+        guard server.kind == .local || !isDemo else { return nil }
+        guard connections[tabID] != .checking else { return nil }
+        let token = UUID()
+        connectionTokens[tabID] = token
+        connections[tabID] = .checking
+        defer { if connectionTokens[tabID] == token { connectionChecks[tabID] = nil } }
+        do {
+            if server.kind == .local {
+                let command = try LocalMachine.terminal()
+                connections[tabID] = .launched
+                return command
+            }
+            if !create && probeExisting {
+                let probe = try SSHCommandBuilder.probe(server: server, account: account, tab: tab)
+                let execute = self.execute
+                let check = Task { try await execute(probe, 8) }
+                connectionChecks[tabID] = check
+                let result = try await check.value
+                guard connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
+                guard result.exitCode == 0 else {
+                    switch result.exitCode {
+                    case 44: connections[tabID] = .missing
+                    case 127: connections[tabID] = .failed("원격 tmux가 설치되어 있지 않습니다.")
+                    case 255: connections[tabID] = .authenticationRequired("SSH 사전 확인 실패. 터미널에서 인증하고 연결할 수 있습니다.\n\(String(result.stderr.prefix(600)))")
+                    default: connections[tabID] = .failed("SSH 세션 확인 실패 (\(result.exitCode)). \(String(result.stderr.prefix(600)))")
+                    }
+                    return nil
+                }
+            }
+            guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
+                  workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
+            let command = try SSHCommandBuilder.terminal(server: server, account: account, tab: tab, create: create)
+            connections[tabID] = .launched
+            return command
+        } catch {
+            if connectionTokens[tabID] == token { connections[tabID] = .failed(error.localizedDescription) }
+            return nil
+        }
+    }
+
+    func start() {
+        guard scheduler == nil else { return }
+        scheduler = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.tick(at: Date())
+                do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+            }
+        }
+    }
+    func stop() {
+        scheduler?.cancel(); scheduler = nil
+        for task in polls.values { task.cancel() }
+        for id in Array(connectionTokens.keys) { disconnected(id) }
+    }
+    func pollInterval(for id: UUID) -> TimeInterval { workspace.selectedServerID == id ? 2 : 10 }
+    func tick(at time: Date) {
+        now = time
+        if isDemo, time.timeIntervalSince(lastDemoRefresh) >= 2 { refreshDemo(at: time) }
+        if time.timeIntervalSince(lastAttempts[LocalMachine.serverID] ?? .distantPast) >= pollInterval(for: LocalMachine.serverID) {
+            lastAttempts[LocalMachine.serverID] = time
+            record(localCollector.collect(timestamp: time), for: LocalMachine.serverID)
+        }
+        for id in dueServerIDs(now: time) { poll(id, at: time) }
+    }
+    func dueServerIDs(now: Date) -> [UUID] {
+        guard !isDemo else { return [] }
+        let slots = max(0, 3 - polls.count)
+        return workspace.servers
+            .filter { $0.kind == .ssh && $0.monitoringEnabled && $0.monitorAccountID != nil && polls[$0.id] == nil && now.timeIntervalSince(lastAttempts[$0.id] ?? .distantPast) >= pollInterval(for: $0.id) }
+            .sorted { lhs, rhs in
+                let leftSelected = lhs.id == workspace.selectedServerID
+                let rightSelected = rhs.id == workspace.selectedServerID
+                if leftSelected != rightSelected { return leftSelected }
+                return (lastAttempts[lhs.id] ?? .distantPast) < (lastAttempts[rhs.id] ?? .distantPast)
+            }
+            .prefix(slots).map(\.id)
+    }
+    private func poll(_ id: UUID, at time: Date) {
+        guard let server = workspace.servers.first(where: { $0.id == id }), let account = server.accounts.first(where: { $0.id == server.monitorAccountID }) else { return }
+        lastAttempts[id] = time
+        polls[id] = Task { [weak self] in
+            guard let self else { return }
+            defer { self.polls[id] = nil }
+            do {
+                let result = try await self.execute(SSHCommandBuilder.monitor(server: server, account: account), 8)
+                guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
+                guard result.exitCode == 0 else { throw UIError.message("수집 실패 (\(result.exitCode)): \(String(result.stderr.prefix(400)))") }
+                let raw = try MetricsParser.parse(result.stdout, timestamp: Date())
+                let snapshot = MetricsCalculator.calculate(current: raw, previous: self.previous[id])
+                self.previous[id] = raw
+                self.record(snapshot, for: id)
+                self.collectionErrors[id] = nil
+            } catch {
+                if !Task.isCancelled { self.collectionErrors[id] = error.localizedDescription }
+            }
+        }
+    }
+    private func persist() {
+        guard !isDemo, !persistenceBlocked else { return }
+        do { try store.save(workspace); persistenceError = nil }
+        catch { persistenceError = "저장 실패: \(error.localizedDescription)\n\(storeURL.path)" }
+    }
+
+    private func record(_ snapshot: MetricsSnapshot, for id: UUID) {
+        metrics[id] = snapshot
+        var history = histories[id] ?? []
+        history.append(snapshot)
+        history.removeAll { snapshot.timestamp.timeIntervalSince($0.timestamp) > 900 }
+        histories[id] = Array(history.suffix(450))
+    }
+
+    private func refreshDemo(at time: Date) {
+        lastDemoRefresh = time
+        for server in workspace.servers where server.kind == .ssh && server.name != "Backup" {
+            guard var snapshot = metrics[server.id] else { continue }
+            snapshot.timestamp = time
+            metrics[server.id] = snapshot
+            var history = histories[server.id] ?? []
+            history.append(snapshot)
+            history.removeAll { time.timeIntervalSince($0.timestamp) > 900 }
+            histories[server.id] = Array(history.suffix(450))
+        }
+    }
+
+    private func makeDemo() {
+        let names = ["GPU Lab 01", "GPU Lab 02", "GPU Lab 03", "GPU Lab 04", "Inference", "Web Server", "Web Staging", "Build Server", "Storage", "Backup"]
+        let values: [[Double?]] = [[0.42,0.68,0.73,0.96,0.80],[0.76,0.82,0.61,0.99,0.91],[0.31,0.47,0.54,0.64,0.58],[0.08,0.22,0.39,0,0.04],[0.24,0.56,0.42,0.38,0.65],[0.18,0.36,0.46,nil,nil],[0.12,0.28,0.31,nil,nil],[0.62,0.71,0.67,nil,nil],[0.26,0.52,0.88,nil,nil],[nil,nil,nil,nil,nil]]
+        for (index, name) in names.enumerated() {
+            let admin = SSHAccount(username: "admin"), trainer = SSHAccount(username: "trainer")
+            let server = ServerProfile(name: name, host: "demo-\(index + 1).invalid", accounts: [admin, trainer], monitorAccountID: admin.id, monitoringEnabled: false)
+            workspace.servers.append(server)
+            let first = TerminalTab(serverID: server.id, accountID: index < 5 ? trainer.id : admin.id, title: index < 5 ? "학습" : "셸")
+            let second = TerminalTab(serverID: server.id, accountID: admin.id, title: "셸")
+            try? workspace.add(tab: first); try? workspace.add(tab: second)
+            workspace.select(tabID: first.id)
+            let v = values[index], gib = 1_073_741_824.0
+            let timestamp = Date().addingTimeInterval(index == 9 ? -720 : 0)
+            metrics[server.id] = MetricsSnapshot(timestamp: timestamp, cpu: v[0], ram: v[1], disk: v[2], gpu: v[3], vram: v[4], memoryUsedBytes: v[1].map { $0 * 64 * gib }, memoryTotalBytes: index == 9 ? nil : 64 * gib, diskUsedBytes: v[2].map { $0 * 2048 * gib }, diskTotalBytes: index == 9 ? nil : 2048 * gib, gpus: index < 5 ? [GPUReading(name: "NVIDIA RTX 4090 · 가상", utilization: v[3], memoryUsedBytes: v[4].map { $0 * 24 * gib }, memoryTotalBytes: 24 * gib)] : [], network: index == 9 ? [] : [NetworkRate(name: "eth0 · 가상", receivedBytesPerSecond: 24_800_000, sentBytesPerSecond: 3_200_000)], warnings: index == 9 ? ["데모: 수집 중단 예시"] : index >= 5 ? ["데모: GPU 미지원 예시"] : [])
+        }
+        if let first = workspace.servers.first { workspace.select(serverID: first.id) }
+    }
+}
+
+enum UIError: LocalizedError {
+    case message(String)
+    var errorDescription: String? { if case .message(let value) = self { return value }; return nil }
+}

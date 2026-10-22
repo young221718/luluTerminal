@@ -66,8 +66,8 @@ struct ResourceInspector: View {
     private func computeMetric(_ title: String, value: Double?, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title).font(.system(size: 10)).foregroundStyle(appearance.colors.muted)
-            animatedNumber(value == nil ? "—" : percentage(value), value: value).font(.system(size: 18, weight: .medium)).monospacedDigit()
-            ResourceBar(value: value, color: utilizationColor).frame(height: 4)
+            animatedNumber(value).font(.system(size: 18, weight: .medium)).monospacedDigit()
+            ResourceBar(value: value, color: utilizationColor, interval: interval).frame(height: 4)
             Text(value == nil ? "측정 없음" : detail).font(.system(size: 9)).foregroundStyle(appearance.colors.muted)
                 .lineLimit(1).minimumScaleFactor(0.75)
         }.frame(maxWidth: .infinity, alignment: .leading)
@@ -81,8 +81,8 @@ struct ResourceInspector: View {
         return VStack(alignment: .leading, spacing: 3) {
             Text("네트워크").font(.system(size: 10)).foregroundStyle(appearance.colors.muted)
             if received != nil || sent != nil {
-                animatedNumber("↓ \(megabyteRate(received))", value: received).padding(.top, 2)
-                animatedNumber("↑ \(megabyteRate(sent))", value: sent)
+                animatedNumber(received, format: .megabytesPerSecond, prefix: "↓ ").padding(.top, 2)
+                animatedNumber(sent, format: .megabytesPerSecond, prefix: "↑ ")
                 Text("MB/s").font(.system(size: 9)).foregroundStyle(appearance.colors.muted)
             } else {
                 Text("—").font(.system(size: 18, weight: .medium))
@@ -140,14 +140,14 @@ struct ResourceInspector: View {
                 ZStack {
                     resourceRing(gpu.utilization, color: utilizationColor, diameter: 41)
                     resourceRing(vram, color: vramColor, diameter: 35)
-                    animatedNumber(gpu.utilization == nil ? "—" : percentage(gpu.utilization), value: gpu.utilization)
+                    animatedNumber(gpu.utilization)
                         .font(.system(size: 10)).monospacedDigit()
                 }.frame(width: 44, height: 44)
             } else {
                 VStack(spacing: 5) {
-                    animatedNumber(gpu.utilization == nil ? "—" : percentage(gpu.utilization), value: gpu.utilization).font(.system(size: 11)).monospacedDigit()
-                    ResourceBar(value: gpu.utilization, color: utilizationColor).frame(height: 4)
-                    ResourceBar(value: vram, color: vramColor).frame(height: 4)
+                    animatedNumber(gpu.utilization).font(.system(size: 11)).monospacedDigit()
+                    ResourceBar(value: gpu.utilization, color: utilizationColor, interval: interval).frame(height: 4)
+                    ResourceBar(value: vram, color: vramColor, interval: interval).frame(height: 4)
                 }.frame(maxWidth: .infinity).frame(height: 44)
             }
             VStack(spacing: 2) {
@@ -166,16 +166,18 @@ struct ResourceInspector: View {
             if let amount {
                 Circle().trim(from: 0, to: amount)
                     .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .butt)).rotationEffect(.degrees(-90))
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: amount)
+                    .animation(ResourceInterpolation.animation(interval: interval, reduceMotion: reduceMotion), value: amount)
             }
         }.frame(width: diameter, height: diameter)
     }
 
-    private func animatedNumber(_ text: String, value: Double?) -> some View {
-        let measured = value.flatMap { $0.isFinite ? $0 : nil }
-        return Text(text)
-            .contentTransition(reduceMotion || measured == nil ? .identity : .numericText(value: measured ?? 0))
-            .animation(reduceMotion || measured == nil ? nil : .easeInOut(duration: 0.45), value: measured)
+    @ViewBuilder private func animatedNumber(_ value: Double?, format: ResourceNumberFormat = .percentage, prefix: String = "") -> some View {
+        if let value, value.isFinite {
+            ResourceInterpolatedNumber(value: value, format: format, prefix: prefix)
+                .animation(ResourceInterpolation.animation(interval: interval, reduceMotion: reduceMotion), value: value)
+        } else {
+            Text(prefix + format.text(value))
+        }
     }
 
     private func legend(_ title: String, color: Color) -> some View {
@@ -206,7 +208,7 @@ struct ResourceInspector: View {
                         Text(byteText(disk.availableBytes)).fixedSize().monospacedDigit()
                         if low { Image(systemName: "exclamationmark.triangle.fill") }
                     }.font(.system(size: 10)).foregroundStyle(low ? Color.orange : appearance.colors.text)
-                    ResourceBar(value: disk.utilization, color: low ? .orange : utilizationColor).frame(height: 4)
+                    ResourceBar(value: disk.utilization, color: low ? .orange : utilizationColor, interval: interval).frame(height: 4)
                 }.help("\(disk.mountPoint) · 남은 용량 \(byteText(disk.availableBytes)) · 사용률 \(percentage(disk.utilization))")
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(disk.mountPoint), 남은 용량 \(byteText(disk.availableBytes)), 사용률 \(percentage(disk.utilization))\(low ? ", 남은 용량 주의" : "")")
@@ -229,6 +231,7 @@ private struct ResourceBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let value: Double?
     let color: Color
+    let interval: TimeInterval
     var body: some View {
         let amount = value.flatMap { $0.isFinite ? min(1, max(0, $0)) : nil }
         GeometryReader { geometry in
@@ -236,7 +239,7 @@ private struct ResourceBar: View {
                 Capsule().fill(appearance.colors.track)
                 if let amount {
                     Capsule().fill(color).frame(width: geometry.size.width * amount)
-                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: amount)
+                        .animation(ResourceInterpolation.animation(interval: interval, reduceMotion: reduceMotion), value: amount)
                 }
             }
         }.accessibilityHidden(true)

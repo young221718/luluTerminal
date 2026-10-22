@@ -3,21 +3,28 @@ import GhosttyTerminal
 import SwiftUI
 
 public struct TerminalPane: NSViewRepresentable {
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var host: TerminalHost
     private let id: UUID
+    private let style: TerminalStyle
 
-    public init(host: TerminalHost, id: UUID) {
+    public init(host: TerminalHost, id: UUID, style: TerminalStyle = .default) {
         self.host = host
         self.id = id
+        self.style = style
     }
 
     public func makeNSView(context: Context) -> NSView {
+        host.setStyle(style)
+        host.setColorScheme(colorScheme == .dark ? .dark : .light)
         let container = TerminalContainer()
         container.show(host.view(for: id))
         return container
     }
 
     public func updateNSView(_ nsView: NSView, context: Context) {
+        host.setStyle(style)
+        host.setColorScheme(colorScheme == .dark ? .dark : .light)
         (nsView as? TerminalContainer)?.show(host.view(for: id))
     }
 

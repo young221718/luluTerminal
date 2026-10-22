@@ -4,6 +4,10 @@ import InfraCore
 
 @MainActor
 public final class AppModel: ObservableObject {
+    public static var defaultStoreURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("InfraTerminal/workspace-v1.json")
+    }
     @Published public private(set) var workspace = WorkspaceState()
     @Published private(set) var metrics: [UUID: MetricsSnapshot] = [:]
     @Published private(set) var histories: [UUID: [MetricsSnapshot]] = [:]
@@ -24,6 +28,8 @@ public final class AppModel: ObservableObject {
     private var connectionChecks: [UUID: Task<ProcessResult, Error>] = [:]
     private var scheduler: Task<Void, Never>?
     private var lastDemoRefresh = Date.distantPast
+    private var monitoringEnabled = true
+    private var selectedPollInterval: TimeInterval = 2
     private var localCollector = LocalMetricsCollector()
 
     enum ConnectionState: Equatable {
@@ -48,8 +54,7 @@ public final class AppModel: ObservableObject {
     init(demo: Bool, storeURL: URL?, execute: @escaping CommandExecutor) {
         self.isDemo = demo
         self.execute = execute
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        self.storeURL = storeURL ?? support.appendingPathComponent("InfraTerminal/workspace-v1.json")
+        self.storeURL = storeURL ?? Self.defaultStoreURL
         self.store = StateStore(url: self.storeURL)
         if demo {
             makeDemo()
@@ -200,10 +205,23 @@ public final class AppModel: ObservableObject {
         for task in polls.values { task.cancel() }
         for id in Array(connectionTokens.keys) { disconnected(id) }
     }
-    func pollInterval(for id: UUID) -> TimeInterval { workspace.selectedServerID == id ? 2 : 10 }
+    func configureMonitoring(enabled: Bool, selectedInterval: TimeInterval) {
+        let wasEnabled = monitoringEnabled
+        monitoringEnabled = enabled
+        selectedPollInterval = MonitoringPreferences.validInterval(selectedInterval)
+        if !enabled {
+            for task in polls.values { task.cancel() }
+        } else if !wasEnabled {
+            lastAttempts.removeAll()
+            previous.removeAll()
+            localCollector = LocalMetricsCollector()
+        }
+    }
+    func pollInterval(for id: UUID) -> TimeInterval { workspace.selectedServerID == id ? selectedPollInterval : max(10, selectedPollInterval) }
     func tick(at time: Date) {
         now = time
-        if isDemo, time.timeIntervalSince(lastDemoRefresh) >= 2 { refreshDemo(at: time) }
+        guard monitoringEnabled else { return }
+        if isDemo, time.timeIntervalSince(lastDemoRefresh) >= selectedPollInterval { refreshDemo(at: time) }
         if time.timeIntervalSince(lastAttempts[LocalMachine.serverID] ?? .distantPast) >= pollInterval(for: LocalMachine.serverID) {
             lastAttempts[LocalMachine.serverID] = time
             record(localCollector.collect(timestamp: time), for: LocalMachine.serverID)
@@ -211,7 +229,7 @@ public final class AppModel: ObservableObject {
         for id in dueServerIDs(now: time) { poll(id, at: time) }
     }
     func dueServerIDs(now: Date) -> [UUID] {
-        guard !isDemo else { return [] }
+        guard monitoringEnabled, !isDemo else { return [] }
         let slots = max(0, 3 - polls.count)
         return workspace.servers
             .filter { $0.kind == .ssh && $0.monitoringEnabled && $0.monitorAccountID != nil && polls[$0.id] == nil && now.timeIntervalSince(lastAttempts[$0.id] ?? .distantPast) >= pollInterval(for: $0.id) }
@@ -283,7 +301,18 @@ public final class AppModel: ObservableObject {
             workspace.select(tabID: first.id)
             let v = values[index], gib = 1_073_741_824.0
             let timestamp = Date().addingTimeInterval(index == 9 ? -720 : 0)
-            metrics[server.id] = MetricsSnapshot(timestamp: timestamp, cpu: v[0], ram: v[1], disk: v[2], gpu: v[3], vram: v[4], memoryUsedBytes: v[1].map { $0 * 64 * gib }, memoryTotalBytes: index == 9 ? nil : 64 * gib, diskUsedBytes: v[2].map { $0 * 2048 * gib }, diskTotalBytes: index == 9 ? nil : 2048 * gib, gpus: index < 5 ? [GPUReading(name: "NVIDIA RTX 4090 · 가상", utilization: v[3], memoryUsedBytes: v[4].map { $0 * 24 * gib }, memoryTotalBytes: 24 * gib)] : [], network: index == 9 ? [] : [NetworkRate(name: "eth0 · 가상", receivedBytesPerSecond: 24_800_000, sentBytesPerSecond: 3_200_000)], warnings: index == 9 ? ["데모: 수집 중단 예시"] : index >= 5 ? ["데모: GPU 미지원 예시"] : [])
+            let demoGPUUsage = [v[3], v[3].map { max(0, $0 - 0.12) }, v[3].map { min(1, $0 + 0.02) }, v[3].map { $0 * 0.1 }]
+            let demoGPUs = index < 5 ? (0..<4).map { gpuIndex in
+                GPUReading(name: "NVIDIA RTX 4090 · 가상", utilization: demoGPUUsage[gpuIndex],
+                           memoryUsedBytes: v[4].map { $0 * Double(4 - gpuIndex) / 4 * 24 * gib }, memoryTotalBytes: 24 * gib,
+                           id: "demo-\(index)-gpu-\(gpuIndex)", index: gpuIndex)
+            } : []
+            let demoDisks = index == 9 ? [] : [
+                DiskReading(id: "demo-root", mountPoint: "/", totalBytes: 1024 * gib, usedBytes: 444 * gib, availableBytes: 580 * gib),
+                DiskReading(id: "demo-data", mountPoint: "/data", totalBytes: 4000 * gib, usedBytes: 3760 * gib, availableBytes: 240 * gib),
+                DiskReading(id: "demo-nas", mountPoint: "/mnt/nas", totalBytes: 20000 * gib, usedBytes: 8600 * gib, availableBytes: 11400 * gib)
+            ]
+            metrics[server.id] = MetricsSnapshot(timestamp: timestamp, cpu: v[0], ram: v[1], disk: v[2], gpu: v[3], vram: v[4], memoryUsedBytes: v[1].map { $0 * 64 * gib }, memoryTotalBytes: index == 9 ? nil : 64 * gib, diskUsedBytes: v[2].map { $0 * 2048 * gib }, diskTotalBytes: index == 9 ? nil : 2048 * gib, gpus: demoGPUs, network: index == 9 ? [] : [NetworkRate(name: "eth0 · 가상", receivedBytesPerSecond: 24_800_000, sentBytesPerSecond: 3_200_000)], warnings: index == 9 ? ["데모: 수집 중단 예시"] : index >= 5 ? ["데모: GPU 미지원 예시"] : [], disks: demoDisks)
         }
         if let first = workspace.servers.first { workspace.select(serverID: first.id) }
     }

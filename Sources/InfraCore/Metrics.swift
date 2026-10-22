@@ -1,11 +1,31 @@
 import Foundation
 
+public struct DiskReading: Equatable, Sendable {
+    public var id: String
+    public var mountPoint: String
+    public var totalBytes: Double?
+    public var usedBytes: Double?
+    public var availableBytes: Double?
+    public init(id: String, mountPoint: String, totalBytes: Double? = nil, usedBytes: Double? = nil, availableBytes: Double? = nil) {
+        self.id = id; self.mountPoint = mountPoint; self.totalBytes = totalBytes; self.usedBytes = usedBytes; self.availableBytes = availableBytes
+    }
+    public var utilization: Double? {
+        guard let totalBytes, let availableBytes, totalBytes.isFinite, availableBytes.isFinite,
+              totalBytes > 0, availableBytes >= 0, availableBytes <= totalBytes else { return nil }
+        // Reserved filesystem blocks are unavailable to the user and count toward capacity pressure.
+        return (totalBytes - availableBytes) / totalBytes
+    }
+}
+
 public struct GPUReading: Equatable, Sendable {
+    public var id: String?
+    public var index: Int?
     public var name: String
     public var utilization: Double?
     public var memoryUsedBytes: Double?
     public var memoryTotalBytes: Double?
-    public init(name: String, utilization: Double? = nil, memoryUsedBytes: Double? = nil, memoryTotalBytes: Double? = nil) {
+    public init(name: String, utilization: Double? = nil, memoryUsedBytes: Double? = nil, memoryTotalBytes: Double? = nil, id: String? = nil, index: Int? = nil) {
+        self.id = id; self.index = index
         self.name = name; self.utilization = utilization; self.memoryUsedBytes = memoryUsedBytes; self.memoryTotalBytes = memoryTotalBytes
     }
 }
@@ -31,12 +51,13 @@ public struct MetricsSnapshot: Equatable, Sendable {
     public var gpus: [GPUReading]
     public var network: [NetworkRate]
     public var warnings: [String]
+    public var disks: [DiskReading]
     public init(timestamp: Date, cpu: Double? = nil, ram: Double? = nil, disk: Double? = nil, gpu: Double? = nil, vram: Double? = nil,
                 memoryUsedBytes: Double? = nil, memoryTotalBytes: Double? = nil, diskUsedBytes: Double? = nil, diskTotalBytes: Double? = nil,
-                gpus: [GPUReading] = [], network: [NetworkRate] = [], warnings: [String] = []) {
+                gpus: [GPUReading] = [], network: [NetworkRate] = [], warnings: [String] = [], disks: [DiskReading] = []) {
         self.timestamp = timestamp; self.cpu = cpu; self.ram = ram; self.disk = disk; self.gpu = gpu; self.vram = vram
         self.memoryUsedBytes = memoryUsedBytes; self.memoryTotalBytes = memoryTotalBytes; self.diskUsedBytes = diskUsedBytes; self.diskTotalBytes = diskTotalBytes
-        self.gpus = gpus; self.network = network; self.warnings = warnings
+        self.gpus = gpus; self.network = network; self.warnings = warnings; self.disks = disks
     }
     public func isStale(now: Date, interval: TimeInterval) -> Bool {
         !interval.isFinite || interval <= 0 || now.timeIntervalSince(timestamp) >= interval * 3
@@ -54,6 +75,7 @@ public struct RawMetrics: Sendable {
     public var gpus: [GPUReading]
     public var networkCounters: [String: (received: UInt64, sent: UInt64)]
     public var warnings: [String]
+    public var disks: [DiskReading] = []
 }
 public enum MetricsParseError: Error, LocalizedError {
     case invalidEnvelope
@@ -61,15 +83,16 @@ public enum MetricsParseError: Error, LocalizedError {
 }
 public enum MetricsParser {
     public static func parse(_ output: String, timestamp: Date) throws -> RawMetrics {
-        let lines = output.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let originalLines = output.components(separatedBy: .newlines)
+        let lines = originalLines.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard lines.first == "__INFRA_V1__", lines.last(where: { !$0.isEmpty }) == "__INFRA_END__" else { throw MetricsParseError.invalidEnvelope }
         var sections: [String: [String]] = [:]
         var section: String?
-        for line in lines.dropFirst() {
+        for (line, original) in zip(lines.dropFirst(), originalLines.dropFirst()) {
             if line.hasPrefix("__INFRA_"), line.hasSuffix("__") {
                 guard sections[line] == nil else { throw MetricsParseError.invalidEnvelope }
                 section = line; sections[line] = []
-            } else if !line.isEmpty, let section { sections[section, default: []].append(line) }
+            } else if !line.isEmpty, let section { sections[section, default: []].append(section == "__INFRA_DISK__" ? original : line) }
         }
         var raw = RawMetrics(timestamp: timestamp, bootID: nil, uptime: nil, cpuCounters: nil, memoryTotalBytes: nil,
                              memoryAvailableBytes: nil, diskUsedBytes: nil, diskTotalBytes: nil, gpus: [], networkCounters: [:], warnings: [])
@@ -90,11 +113,25 @@ public enum MetricsParser {
             raw.memoryTotalBytes = total; raw.memoryAvailableBytes = available
         } else { raw.warnings.append("RAM unavailable: MemTotal/MemAvailable invalid.") }
         for line in sections["__INFRA_DISK__"] ?? [] {
-            let fields = line.split(whereSeparator: \.isWhitespace)
-            if fields.count >= 6, fields.last == "/", let total = positive(String(fields[1])),
-               let used = positive(String(fields[2]), allowZero: true), used <= total {
-                raw.diskTotalBytes = total * 1024; raw.diskUsedBytes = used * 1024
+            if line == "DISK_ERROR" { raw.warnings.append("Filesystem collection failed or timed out; disk readings may be incomplete."); continue }
+            if line == "ALL_MOUNTS_UNAVAILABLE" { raw.warnings.append("All mounted filesystem collection unavailable: timeout command missing; root-only reading."); continue }
+            let fields = line.split(whereSeparator: \.isWhitespace).map(String.init)
+            let typed = fields.count >= 7 && fields[5].hasSuffix("%")
+            let offset = typed ? 1 : 0
+            guard fields.count >= 6 + offset, fields[4 + offset].hasSuffix("%") else { continue }
+            if typed, excludedFilesystems.contains(fields[1]) { continue }
+            let mount = String(line.split(maxSplits: 5 + offset, whereSeparator: \.isWhitespace).last ?? "")
+            guard mount.hasPrefix("/"), !raw.disks.contains(where: { $0.id == mount }) else { continue }
+            let total = positive(fields[1 + offset]).flatMap(kibibytes)
+            let used = positive(fields[2 + offset], allowZero: true).flatMap(kibibytes).flatMap { value in
+                total.flatMap { value <= $0 ? value : nil }
             }
+            let available = positive(fields[3 + offset], allowZero: true).flatMap(kibibytes).flatMap { value in
+                total.flatMap { value <= $0 ? value : nil }
+            }
+            raw.disks.append(DiskReading(id: mount, mountPoint: mount, totalBytes: total, usedBytes: used, availableBytes: available))
+            if mount == "/" { raw.diskTotalBytes = total; raw.diskUsedBytes = used }
+            if total == nil || used == nil || available == nil { raw.warnings.append("Filesystem \(mount) contains unavailable values.") }
         }
         if raw.diskTotalBytes == nil { raw.warnings.append("Root filesystem usage unavailable.") }
         for line in sections["__INFRA_NET__"] ?? [] {
@@ -110,16 +147,29 @@ public enum MetricsParser {
             if line == "UNAVAILABLE" { raw.warnings.append("NVIDIA GPU collection unavailable."); continue }
             if line == "ERROR" { raw.warnings.append("NVIDIA GPU collection failed."); continue }
             let fields = csvFields(line)
-            guard fields.count == 4, !fields[0].isEmpty else { raw.warnings.append("Malformed NVIDIA GPU response."); continue }
-            let utilization = positive(fields[1], allowZero: true).flatMap { $0 <= 100 ? $0 / 100 : nil }
-            let total = positive(fields[3]).map { $0 * 1024 * 1024 }
-            let used = positive(fields[2], allowZero: true).map { $0 * 1024 * 1024 }.flatMap { value in total.flatMap { value <= $0 ? value : nil } }
-            raw.gpus.append(GPUReading(name: fields[0], utilization: utilization, memoryUsedBytes: used, memoryTotalBytes: total))
-            if utilization == nil || used == nil || total == nil { raw.warnings.append("GPU \(fields[0]) contains unavailable values.") }
+            guard fields.count == 4 || fields.count == 6 else { raw.warnings.append("Malformed NVIDIA GPU response."); continue }
+            let offset = fields.count == 6 ? 2 : 0
+            let name = fields[offset]
+            guard !name.isEmpty else { raw.warnings.append("Malformed NVIDIA GPU response."); continue }
+            let id = offset == 2 && !fields[0].isEmpty && fields[0] != "N/A" ? fields[0] : nil
+            let index = offset == 2 ? Int(fields[1]).flatMap { $0 >= 0 ? $0 : nil } : nil
+            let utilization = positive(fields[1 + offset], allowZero: true).flatMap { $0 <= 100 ? $0 / 100 : nil }
+            let total = positive(fields[3 + offset]).flatMap { kibibytes($0 * 1024) }
+            let used = positive(fields[2 + offset], allowZero: true).flatMap { kibibytes($0 * 1024) }.flatMap { value in total.flatMap { value <= $0 ? value : nil } }
+            raw.gpus.append(GPUReading(name: name, utilization: utilization, memoryUsedBytes: used, memoryTotalBytes: total, id: id, index: index))
+            if utilization == nil || used == nil || total == nil { raw.warnings.append("GPU \(name) contains unavailable values.") }
         }
         if raw.gpus.isEmpty, raw.warnings.allSatisfy({ !$0.contains("GPU") }) { raw.warnings.append("NVIDIA GPU response missing.") }
         if raw.bootID == nil || raw.uptime == nil { raw.warnings.append("Boot identity/monotonic time unavailable; counter rates are unknown.") }
         return raw
+    }
+    private static let excludedFilesystems: Set<String> = [
+        "tmpfs", "devtmpfs", "overlay", "squashfs", "proc", "sysfs", "cgroup", "cgroup2", "devpts",
+        "securityfs", "debugfs", "tracefs", "pstore", "configfs", "fusectl", "mqueue", "hugetlbfs", "autofs"
+    ]
+    private static func kibibytes(_ value: Double) -> Double? {
+        let bytes = value * 1024
+        return bytes.isFinite ? bytes : nil
     }
     private static func positive(_ string: String, allowZero: Bool = false) -> Double? {
         guard let value = Double(string), value.isFinite, allowZero ? value >= 0 : value > 0 else { return nil }
@@ -139,7 +189,7 @@ public enum MetricsParser {
 public enum MetricsCalculator {
     public static func calculate(current: RawMetrics, previous: RawMetrics?) -> MetricsSnapshot {
         var snapshot = MetricsSnapshot(timestamp: current.timestamp, memoryTotalBytes: current.memoryTotalBytes,
-                                       diskUsedBytes: current.diskUsedBytes, diskTotalBytes: current.diskTotalBytes, gpus: current.gpus, warnings: current.warnings)
+                                       diskUsedBytes: current.diskUsedBytes, diskTotalBytes: current.diskTotalBytes, gpus: current.gpus, warnings: current.warnings, disks: current.disks)
         if let total = current.memoryTotalBytes, let available = current.memoryAvailableBytes {
             snapshot.memoryUsedBytes = total - available; snapshot.ram = ratio(total - available, total)
         }
@@ -189,12 +239,17 @@ public enum LinuxCollector {
     printf '__INFRA_MEM__\\n'
     cat /proc/meminfo
     printf '__INFRA_DISK__\\n'
-    df -Pk /
+    if command -v timeout >/dev/null 2>&1; then
+      timeout -s KILL 2 df -PTk -x tmpfs -x devtmpfs -x overlay -x squashfs -x proc -x sysfs -x cgroup -x cgroup2 -x devpts -x securityfs -x debugfs -x tracefs -x pstore -x configfs -x fusectl -x mqueue -x hugetlbfs -x autofs 2>/dev/null || printf '\\nDISK_ERROR\\n'
+    else
+      printf 'ALL_MOUNTS_UNAVAILABLE\\n'
+      df -Pk / 2>/dev/null || printf '\\nDISK_ERROR\\n'
+    fi
     printf '__INFRA_NET__\\n'
     cat /proc/net/dev
     printf '__INFRA_GPU__\\n'
     if command -v nvidia-smi >/dev/null 2>&1; then
-      nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || printf 'ERROR\\n'
+      nvidia-smi --query-gpu=uuid,index,name,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || printf 'ERROR\\n'
     else
       printf 'UNAVAILABLE\\n'
     fi

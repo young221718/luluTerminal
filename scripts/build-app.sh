@@ -12,11 +12,20 @@ for resource in "$bin_dir"/*.bundle; do
     [ -d "$resource" ] || continue
     ditto "$resource" "$app/Contents/Resources/$(basename "$resource")"
 done
+python3 scripts/check-licenses.py
 install -m 644 docs/THIRD_PARTY.md "$app/Contents/Resources/Licenses/THIRD_PARTY.md"
-for dependency in libghostty-spm DisplayLink; do
-    install -m 644 ".build/checkouts/$dependency/LICENSE" "$app/Contents/Resources/Licenses/$dependency.txt"
+for notice in docs/licenses/*.txt; do
+    install -m 644 "$notice" "$app/Contents/Resources/Licenses/$(basename "$notice")"
 done
-install -m 644 docs/licenses/Ghostty.txt "$app/Contents/Resources/Licenses/Ghostty.txt"
+(
+    export LC_ALL=C
+    cat docs/THIRD_PARTY.md
+    for notice in docs/licenses/*.txt; do
+        printf '\n\n===== %s =====\n\n' "$(basename "$notice")"
+        cat "$notice"
+    done
+) > "$app/Contents/Resources/Licenses/THIRD_PARTY_NOTICES.txt"
+python3 scripts/check-licenses.py --app "$app"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

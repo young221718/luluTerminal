@@ -5,44 +5,28 @@ import GhosttyTerminal
 @MainActor public final class TerminalHost: ObservableObject {
     @Published public private(set) var error: String?
     public var onExit: ((UUID) -> Void)?
-    // The wrapper applies its theme after base config; keep the host palette authoritative.
-    private lazy var controller = TerminalController(theme: .init()) {
-        $0.withFontFamily("Menlo")
-        $0.withFontSize(13)
-        $0.withWindowPaddingX(14)
-        $0.withWindowPaddingY(12)
-        $0.withBackground("0D1725")
-        $0.withForeground("E8EEF8")
-        $0.withCursorColor("49E6CD")
-        $0.withCursorText("0D1725")
-        $0.withSelectionBackground("294159")
-        $0.withSelectionForeground("F5F8FF")
-        $0.withPalette(0, color: "#1A273A")
-        $0.withPalette(1, color: "#E78080")
-        $0.withPalette(2, color: "#58D7A4")
-        $0.withPalette(3, color: "#EAC17C")
-        $0.withPalette(4, color: "#7BAEF2")
-        $0.withPalette(5, color: "#B79BF3")
-        $0.withPalette(6, color: "#49D9D1")
-        $0.withPalette(7, color: "#D9E2EF")
-        $0.withPalette(8, color: "#788AA4")
-        $0.withPalette(9, color: "#F29D98")
-        $0.withPalette(10, color: "#80E5B5")
-        $0.withPalette(11, color: "#F1D399")
-        $0.withPalette(12, color: "#A3C7FF")
-        $0.withPalette(13, color: "#D0B4FF")
-        $0.withPalette(14, color: "#8DEDE3")
-        $0.withPalette(15, color: "#F5F8FF")
-        // User paste uses the native responder; protected requests are
-        // handled by SurfaceEvents, while programs cannot read/write it.
-        $0.withCustom("clipboard-write", "ask")
-        $0.withCustom("shell-integration", "none")
-    }
+    public var onOpenSettings: (() -> Void)?
+    private lazy var controller: TerminalController = {
+        let controller = TerminalController(theme: style.theme) {
+            $0.withWindowPaddingX(14)
+            $0.withWindowPaddingY(12)
+            // User paste uses the native responder; protected requests are
+            // handled by SurfaceEvents, while programs cannot read/write it.
+            $0.withCustom("clipboard-write", "ask")
+            $0.withCustom("shell-integration", "none")
+            // The app owns Settings; Ghostty's default open_config action cannot open it.
+            $0.withCustom("keybind", "super+comma=unbind")
+        }
+        controller.setTerminalConfiguration(style.configuration)
+        controller.setColorScheme(.light)
+        return controller
+    }()
     private struct Entry {
         let view: TerminalView
         let events: SurfaceEvents
     }
     private var entries: [UUID: Entry] = [:]
+    private var style = TerminalStyle.default
     public init() {}
 
     /// Switching tabs reuses the view, PTY, and scrollback. Only explicit
@@ -50,6 +34,7 @@ import GhosttyTerminal
     public func open(id: UUID, command: String) {
         guard entries[id] == nil else { return }
         let view = HostTerminalView(frame: .zero)
+        view.onOpenSettings = { [weak self] in self?.onOpenSettings?() }
         let events = SurfaceEvents { [weak self] in
             self?.onExit?(id)
         }
@@ -82,12 +67,40 @@ import GhosttyTerminal
         for id in Array(entries.keys) { disconnect(id: id) }
     }
 
+    func setStyle(_ next: TerminalStyle) {
+        if next.light != style.light || next.dark != style.dark {
+            if controller.setTheme(next.theme) {
+                style.light = next.light
+                style.dark = next.dark
+            }
+        }
+        if next.fontFamily != style.fontFamily || next.fontSize != style.fontSize {
+            let sizeChanged = next.fontSize != style.fontSize
+            if controller.setTerminalConfiguration(next.configuration) {
+                style.fontFamily = next.fontFamily
+                style.fontSize = next.fontSize
+                // A surface zoom overrides app config; explicit settings size changes reset it.
+                if sizeChanged {
+                    for entry in entries.values { entry.view.performBindingAction("reset_font_size") }
+                }
+            }
+        }
+        if error != controller.lastConfigurationIssue { error = controller.lastConfigurationIssue }
+    }
+
+    func setColorScheme(_ scheme: TerminalColorScheme) {
+        controller.setColorScheme(scheme)
+        if error != controller.lastConfigurationIssue { error = controller.lastConfigurationIssue }
+    }
+
     func view(for id: UUID) -> TerminalView? { entries[id]?.view }
 }
 
 /// Host-owned macOS shortcuts must not be consumed by standalone Ghostty
 /// bindings. Use native responder actions for copy/paste and app termination.
 @MainActor private final class HostTerminalView: TerminalView {
+    var onOpenSettings: (() -> Void)?
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.type == .keyDown, window?.firstResponder === self,
            let shortcut = HostShortcut(characters: event.charactersIgnoringModifiers,
@@ -96,6 +109,7 @@ import GhosttyTerminal
             case .quit: NSApp.terminate(nil); return true
             case .copy: copy(nil); return true
             case .paste: paste(nil); return true
+            case .settings: onOpenSettings?(); return true
             }
         }
         return super.performKeyEquivalent(with: event)
@@ -103,13 +117,14 @@ import GhosttyTerminal
 }
 
 enum HostShortcut: Equatable {
-    case quit, copy, paste
+    case quit, copy, paste, settings
     init?(characters: String?, keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
         guard modifiers.intersection([.command, .control, .option, .shift]) == .command else { return nil }
         switch characters?.lowercased() {
         case "q": self = .quit
         case "c": self = .copy
         case "v": self = .paste
+        case ",": self = .settings
         default:
             // Non-Latin input sources (for example Korean ㅍ on the V key)
             // still use physical Command shortcuts. Preserve Latin remapping.
@@ -118,6 +133,7 @@ enum HostShortcut: Equatable {
             case 12: self = .quit
             case 8: self = .copy
             case 9: self = .paste
+            case 43: self = .settings
             default: return nil
             }
         }

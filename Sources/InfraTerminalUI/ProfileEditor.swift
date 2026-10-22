@@ -58,6 +58,9 @@ struct ProfileEditor: View {
                             }.disabled(demo)
                             if account.authMethod == .password {
                                 SecureField(hasSavedPassword(account) ? "새 비밀번호 · 비워두면 유지" : "비밀번호", text: passwordBinding(account.id))
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(maxWidth: .infinity)
                                     .textContentType(.password)
                                     .accessibilityLabel("\(account.username) SSH 비밀번호")
                                 HStack(alignment: .top) {

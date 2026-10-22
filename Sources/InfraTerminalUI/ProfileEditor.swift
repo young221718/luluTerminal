@@ -9,6 +9,8 @@ struct ProfileEditor: View {
     @ViewState private var error: String?
     @ViewState private var passwords: [UUID: String] = [:]
     @ViewState private var saving = false
+    @ViewState private var koreanInputSource = PasswordInputWarning.currentSourceIsKorean
+    @FocusState private var focusedPasswordAccountID: UUID?
     let lockedAccountIDs: Set<UUID>
     let isNew: Bool
     let demo: Bool
@@ -63,6 +65,11 @@ struct ProfileEditor: View {
                                     .frame(maxWidth: .infinity)
                                     .textContentType(.password)
                                     .accessibilityLabel("\(account.username) SSH 비밀번호")
+                                    .focused($focusedPasswordAccountID, equals: account.id)
+                                if let warning = PasswordInputWarning.message(password: passwords[account.id] ?? "", isFocused: focusedPasswordAccountID == account.id, koreanInputSource: koreanInputSource) {
+                                    Label(warning, systemImage: "exclamationmark.triangle")
+                                        .font(.caption).foregroundStyle(.orange)
+                                }
                                 HStack(alignment: .top) {
                                     Label(hasSavedPassword(account) ? "이 연결 대상에 저장됨" : "저장할 비밀번호를 입력하세요", systemImage: hasSavedPassword(account) ? "checkmark.circle" : "key")
                                         .foregroundStyle(appearance.colors.muted)
@@ -102,7 +109,11 @@ struct ProfileEditor: View {
             }
         }.padding(24).frame(width: 540).interactiveDismissDisabled(saving)
             .background(appearance.colors.panel).foregroundStyle(appearance.colors.text).tint(appearance.colors.accent)
+            .onChange(of: focusedPasswordAccountID) { _, _ in refreshInputSource() }
+            .onReceive(NotificationCenter.default.publisher(for: NSTextInputContext.keyboardSelectionDidChangeNotification)) { _ in refreshInputSource() }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refreshInputSource() }
     }
+    private func refreshInputSource() { koreanInputSource = PasswordInputWarning.currentSourceIsKorean }
     private func hasSavedPassword(_ account: SSHAccount) -> Bool {
         guard let reference = account.credential, Int(port) == profile.port else { return false }
         return reference.target.matches(server: profile, account: account)

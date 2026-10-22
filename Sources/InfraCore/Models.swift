@@ -15,10 +15,24 @@ public enum CoreError: Error, LocalizedError, Equatable {
     }
 }
 
+public enum SSHAuthenticationMethod: String, Codable, Sendable { case system, password }
+
 public struct SSHAccount: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var username: String
-    public init(id: UUID = UUID(), username: String) { self.id = id; self.username = username }
+    public var authMethod: SSHAuthenticationMethod
+    public var credential: SSHPasswordReference?
+    public init(id: UUID = UUID(), username: String, authMethod: SSHAuthenticationMethod = .system, credential: SSHPasswordReference? = nil) {
+        self.id = id; self.username = username; self.authMethod = authMethod; self.credential = credential
+    }
+    private enum CodingKeys: String, CodingKey { case id, username, authMethod, credential }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        username = try values.decode(String.self, forKey: .username)
+        authMethod = try values.decodeIfPresent(SSHAuthenticationMethod.self, forKey: .authMethod) ?? .system
+        credential = try values.decodeIfPresent(SSHPasswordReference.self, forKey: .credential)
+    }
 }
 
 public enum ServerConnectionKind: String, Codable, Sendable { case ssh, local }

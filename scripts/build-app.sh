@@ -5,8 +5,9 @@ configuration="${CONFIGURATION:-release}"
 swift build --build-system native -c "$configuration" --product InfraTerminal
 bin_dir="$(swift build --build-system native -c "$configuration" --show-bin-path)"
 app="$PWD/dist/Infra Terminal.app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Licenses"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources/Licenses"
 cp "$bin_dir/InfraTerminal" "$app/Contents/MacOS/InfraTerminal"
+install -m 755 scripts/luluTerminalAskPass "$app/Contents/Helpers/luluTerminalAskPass"
 bash scripts/make-icon.sh Resources/AppIcon.png "$app/Contents/Resources/AppIcon.icns"
 for resource in "$bin_dir"/*.bundle; do
     [ -d "$resource" ] || continue

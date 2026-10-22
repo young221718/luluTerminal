@@ -79,7 +79,7 @@ private final class Execution: @unchecked Sendable {
         let arguments = ([command.executable] + command.arguments).map { strdup($0) }
         defer { arguments.forEach { free($0) } }
         var argv = arguments + [nil]
-        let environment = ProcessInfo.processInfo.environment.map { strdup("\($0.key)=\($0.value)") }
+        let environment = ProcessInfo.processInfo.environment.merging(command.environment) { _, override in override }.map { strdup("\($0.key)=\($0.value)") }
         defer { environment.forEach { free($0) } }
         var envp = environment + [nil]
         lock.lock()

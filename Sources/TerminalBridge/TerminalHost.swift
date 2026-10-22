@@ -31,7 +31,7 @@ import GhosttyTerminal
 
     /// Switching tabs reuses the view, PTY, and scrollback. Only explicit
     /// disconnect/reconnect may replace a surface with this identity.
-    public func open(id: UUID, command: String) {
+    public func open(id: UUID, command: String, environment: [String: String] = [:]) {
         guard entries[id] == nil else { return }
         let view = HostTerminalView(frame: .zero)
         view.onOpenSettings = { [weak self] in self?.onOpenSettings?() }
@@ -42,7 +42,7 @@ import GhosttyTerminal
         view.controller = controller
         view.configuration = TerminalSurfaceOptions(
             backend: .exec,
-            envVars: ["TERM": "xterm-256color"],
+            envVars: ["TERM": "xterm-256color"].merging(environment) { _, supplied in supplied },
             command: command,
             waitAfterCommand: true
         )

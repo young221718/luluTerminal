@@ -94,8 +94,8 @@ public struct InfraRootView: View {
             }
         }
         .sheet(isPresented: $showProfile) {
-            ProfileEditor(profile: editingProfile, lockedAccountIDs: Set(model.workspace.tabs.filter { $0.serverID == editingProfile?.id }.map(\.accountID))) { profile in
-                try model.saveProfile(profile)
+            ProfileEditor(profile: editingProfile, lockedAccountIDs: Set(model.workspace.tabs.filter { $0.serverID == editingProfile?.id }.map(\.accountID)), demo: model.isDemo) { profile, passwords in
+                try await model.saveProfile(profile, passwords: passwords)
                 for tab in model.workspace.tabs where tab.serverID == profile.id { terminal.disconnect(id: tab.id) }
             }
         }
@@ -132,7 +132,7 @@ public struct InfraRootView: View {
         }
         .task {
             terminal.onOpenSettings = { openSettings() }
-            terminal.onExit = { id in model.disconnected(id) }
+            terminal.onExit = { id in model.terminalExited(id) }
             model.configureMonitoring(enabled: monitoring.enabled, selectedInterval: monitoring.refreshInterval)
             model.start()
         }
@@ -314,11 +314,15 @@ public struct InfraRootView: View {
                 } else if case .failed(let error) = state {
                     banner(error, icon: "exclamationmark.triangle", color: .orange)
                 } else if case .authenticationRequired(let error) = state {
-                    HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Label(error, systemImage: "key").textSelection(.enabled)
-                        Spacer(minLength: 0)
-                        Button("터미널에서 인증하고 연결") { connect(tab, create: false, interactive: true) }.fixedSize()
-                    }.font(.caption).padding(12).background(Color.orange.opacity(0.12))
+                        HStack {
+                            if model.account(for: tab)?.authMethod == .password {
+                                Button("비밀번호 재시도") { connect(tab, create: false, retryAuthentication: true) }
+                            }
+                            Button("터미널에서 인증") { connect(tab, create: false, interactive: true) }
+                        }
+                    }.font(.caption).frame(maxWidth: .infinity, alignment: .leading).padding(12).background(Color.orange.opacity(0.12))
                 }
                 if let error = terminal.error { banner(error, icon: "terminal", color: .orange) }
                 if model.isDemo && server.kind == .ssh {
@@ -349,11 +353,11 @@ public struct InfraRootView: View {
         Label(text, systemImage: icon).font(.caption).foregroundStyle(color).textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.vertical, 10).background(color.opacity(0.08))
     }
-    private func connect(_ tab: TerminalTab, create: Bool, interactive: Bool = false) {
+    private func connect(_ tab: TerminalTab, create: Bool, interactive: Bool = false, retryAuthentication: Bool = false) {
         terminal.disconnect(id: tab.id)
         Task {
-            if let command = await model.prepareConnection(tabID: tab.id, create: create, probeExisting: !interactive) {
-                terminal.open(id: tab.id, command: command.shellString)
+            if let command = await model.prepareConnection(tabID: tab.id, create: create, probeExisting: !interactive, retryAuthentication: retryAuthentication, manualAuthentication: interactive) {
+                terminal.open(id: tab.id, command: command.shellString, environment: command.environment)
                 if terminal.error != nil { model.disconnected(tab.id) }
             }
         }

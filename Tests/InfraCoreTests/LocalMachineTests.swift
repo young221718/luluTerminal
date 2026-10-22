@@ -88,6 +88,18 @@ struct LocalMachineCoreTests {
         #expect((0...1).contains(ram))
         #expect((0...1).contains(disk))
         #expect(snapshot.memoryTotalBytes == Double(ProcessInfo.processInfo.physicalMemory))
+        #expect(!snapshot.disks.isEmpty)
+        #expect(snapshot.disks.contains { $0.mountPoint == "/" })
+        #expect(Set(snapshot.disks.map(\.id)).count == snapshot.disks.count)
+        for volume in snapshot.disks {
+            #expect(volume.mountPoint.hasPrefix("/"))
+            let total = try #require(volume.totalBytes)
+            let used = try #require(volume.usedBytes)
+            let available = try #require(volume.availableBytes)
+            #expect(total > 0 && used >= 0 && used <= total)
+            #expect(available >= 0 && available <= total)
+            #expect(volume.utilization.map { (0...1).contains($0) } == true)
+        }
         #expect(snapshot.warnings.contains { $0.contains("캐시") })
     }
 }

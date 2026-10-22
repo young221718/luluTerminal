@@ -107,6 +107,34 @@ public struct LocalMetricsCollector: Sendable {
                 snapshot.disk = Double(total - free) / Double(total)
             } else { snapshot.warnings.append("로컬 홈 볼륨의 용량을 확인할 수 없습니다.") }
         } catch { snapshot.warnings.append("로컬 디스크 수집 실패: \(error.localizedDescription)") }
+        snapshot.disks = Self.mountedDisks()
+        if snapshot.disks.isEmpty { snapshot.warnings.append("로컬 마운트 볼륨의 용량을 확인할 수 없습니다.") }
         return snapshot
+    }
+    private static func mountedDisks() -> [DiskReading] {
+        // Cached mount statistics avoid waiting on removable or network filesystem I/O.
+        let count = getfsstat(nil, 0, MNT_NOWAIT)
+        guard count > 0 else { return [] }
+        var mounts: [statfs] = .init(repeating: .init(), count: Int(count))
+        let read = mounts.withUnsafeMutableBufferPointer { buffer in
+            getfsstat(buffer.baseAddress, Int32(buffer.count * MemoryLayout<statfs>.stride), MNT_NOWAIT)
+        }
+        guard read > 0 else { return [] }
+        return mounts.prefix(min(Int(read), mounts.count)).compactMap { mount in
+            guard mount.f_flags & UInt32(MNT_LOCAL) != 0, mount.f_flags & UInt32(MNT_DONTBROWSE) == 0 else { return nil }
+            var name = mount.f_mntonname
+            let nameSize = MemoryLayout.size(ofValue: name)
+            let path = withUnsafePointer(to: &name) { pointer in
+                pointer.withMemoryRebound(to: CChar.self, capacity: nameSize) { String(cString: $0) }
+            }
+            guard path.hasPrefix("/") else { return nil }
+            let total = Double(mount.f_blocks) * Double(mount.f_bsize)
+            let free = Double(mount.f_bfree) * Double(mount.f_bsize)
+            let available = Double(mount.f_bavail) * Double(mount.f_bsize)
+            guard total.isFinite, total > 0, free >= 0, free <= total, available >= 0, available <= total else {
+                return DiskReading(id: path, mountPoint: path)
+            }
+            return DiskReading(id: path, mountPoint: path, totalBytes: total, usedBytes: total - free, availableBytes: available)
+        }.sorted { $0.mountPoint < $1.mountPoint }
     }
 }

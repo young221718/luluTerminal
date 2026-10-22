@@ -1,0 +1,113 @@
+{
+  "libghostty_spm_revision": "42bacd1339f323a693ddbca779295f4f77e5a697",
+  "displaylink_revision": "41bea2661e04bebcb1c4f15fc0b6197850100fdd",
+  "ghostty_revision": "1e9e14af5df14211892f5fc15fd21a49c7d94868",
+  "binary_checksum": "0bf7e5e13f8e42ffca040a6cef7e985fc30bcaa81ff513bd2a93eb097398c6d8",
+  "notices": [
+    {
+      "file": "DisplayLink.txt",
+      "source": "https://github.com/Lakr233/DisplayLink/blob/41bea2661e04bebcb1c4f15fc0b6197850100fdd/LICENSE",
+      "sha256": "5dffb6c45faaa71f6c393255b135145cc17f0b07e968a705ef58f9c68aeb112d"
+    },
+    {
+      "file": "FreeType.txt",
+      "source": "https://github.com/freetype/freetype/tree/VER-2-13-2",
+      "sha256": "51efe07db97c04377ef0292ddc255f40585bdc65093e95254974e233d724c055"
+    },
+    {
+      "file": "Ghostty.txt",
+      "source": "https://github.com/ghostty-org/ghostty/blob/1e9e14af5df14211892f5fc15fd21a49c7d94868/LICENSE",
+      "sha256": "386211873e5b7a02f663ae4d7adf96285999f91608f8f9f31fecfd0f4095e6f1"
+    },
+    {
+      "file": "Highway.txt",
+      "source": "https://github.com/google/highway/tree/66486a10623fa0d72fe91260f96c892e41aceb06",
+      "sha256": "f31cf79b4168aabec8c697dca3b30633b643e30440659ef2347bcc10e17eaad5"
+    },
+    {
+      "file": "JetBrainsMono.txt",
+      "source": "https://github.com/JetBrains/JetBrainsMono/blob/v2.304/OFL.txt",
+      "sha256": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
+    },
+    {
+      "file": "NerdFontsSymbolsOnly.txt",
+      "source": "https://deps.files.ghostty.org/NerdFontsSymbolsOnly-3.4.0.tar.gz",
+      "sha256": "e26dcbdd3d6659395572bc18d537f60dc461804a2c5efd5797d2ddb17ee1c1c2"
+    },
+    {
+      "file": "Wuffs.txt",
+      "source": "https://deps.files.ghostty.org/wuffs-7411f488fe2e2c205c3d3b3d28638b7356522930.tar.gz",
+      "sha256": "f8ac2c75e7f629a87565c80d61ff9fe5aa15cdea0bda997d52a4dc13fdbd19cb"
+    },
+    {
+      "file": "Zig.txt",
+      "source": "https://github.com/ziglang/zig/blob/master/LICENSE",
+      "sha256": "5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff177"
+    },
+    {
+      "file": "bash-preexec.txt",
+      "source": "https://github.com/Lakr233/libghostty-spm/blob/42bacd1339f323a693ddbca779295f4f77e5a697/Sources/GhosttyTerminal/Resources/Ghostty/shell-integration/bash/LICENSE-bash-preexec.md",
+      "sha256": "7d36c9d9c0ae6e92e7e7000e3aab7715ab6463997f995e100848740fde29c7cf"
+    },
+    {
+      "file": "libghostty-spm.txt",
+      "source": "https://github.com/Lakr233/libghostty-spm/blob/42bacd1339f323a693ddbca779295f4f77e5a697/LICENSE",
+      "sha256": "1f4b38df6a142e678a85d84c3a7ec4d1db328a556483241df714156134e81615"
+    },
+    {
+      "file": "libpng.txt",
+      "source": "https://github.com/pnggroup/libpng/blob/v1.6.43/LICENSE",
+      "sha256": "7317e078e2d3b5d7ba5a6159e650945153262b44b76f6700f8e9edb261c5143e"
+    },
+    {
+      "file": "libvaxis.txt",
+      "source": "https://github.com/rockorager/libvaxis/tree/1dbbe575dff4586fe51e3217aa5c3fecdcbb6089",
+      "sha256": "2f031bd13fad531994c45f3f4a990d4b1f124132b22c24fb1a658854d5dc32b6"
+    },
+    {
+      "file": "libxev.txt",
+      "source": "https://github.com/mitchellh/libxev/tree/9ce8e8e6ff89e583258a7f8e7adeeeaeae8611bf",
+      "sha256": "f04af36ef623e3a957dbc05d0ad050799e69a6fe39d136a950441861f70ee3c4"
+    },
+    {
+      "file": "oniguruma.txt",
+      "source": "https://github.com/kkos/oniguruma/blob/v6.9.9/COPYING",
+      "sha256": "70ba5469ea0bab6e18a32d7009068f996503168d27be57747e08da34337ff26f"
+    },
+    {
+      "file": "simdutf.txt",
+      "source": "https://github.com/simdutf/simdutf/tree/v9.0.0",
+      "sha256": "fc6d0b102b2102d3e2273d605e8fb74197f3cdf63574f0f3d140bf7e2457ebb6"
+    },
+    {
+      "file": "stb.txt",
+      "source": "https://github.com/ghostty-org/ghostty/tree/1e9e14af5df14211892f5fc15fd21a49c7d94868/src/stb",
+      "sha256": "cbb23d6b843b68f3763ad203e2171f33137e2b41b804bd6d67eb9d6b93f1b573"
+    },
+    {
+      "file": "uucode.txt",
+      "source": "https://github.com/jacobsandlund/uucode/tree/9d55524551411b493cca41ca06363625d90aff1e",
+      "sha256": "e2aeb29fcdd609216013ba72d34f0e783d8b8248c140656b2ffcfa757f26dafd"
+    },
+    {
+      "file": "z2d.txt",
+      "source": "https://github.com/vancluever/z2d/tree/7dbae85c81784dba9988320bf9543ed9a81350c8",
+      "sha256": "1eaefd26fb5362c72d5a428e68e9016c83dbf2dc83cfa463c38ce66a1f6ac542"
+    },
+    {
+      "file": "zf.txt",
+      "source": "https://github.com/natecraddock/zf/blob/c35c421f84895193246db06c40683c1a30e616ef/LICENSE",
+      "sha256": "0629000344ad0dc3c6e0e4c1b0c4a5cacf090e17d56e8bc5272705e3d35b7def"
+    },
+    {
+      "file": "zig_objc.txt",
+      "source": "https://github.com/mitchellh/zig-objc/blob/c8de82ff80281215ad92900866dab7103a8efa8b/LICENSE",
+      "sha256": "fcd26bcead569a910dd778cb864e027683498ca414e15db1694a5893eee1b835"
+    },
+    {
+      "file": "zlib.txt",
+      "source": "https://github.com/madler/zlib/blob/v1.3.1/LICENSE",
+      "sha256": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243"
+    }
+  ]
+}

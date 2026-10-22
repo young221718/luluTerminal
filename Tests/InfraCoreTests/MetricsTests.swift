@@ -27,6 +27,68 @@ struct MetricsTests {
         __INFRA_END__
         """
     }
+    @Test func GPUUUIDFormatPreservesDuplicateDeviceNamesAndMissingValues() throws {
+        let raw = try MetricsParser.parse(fixture(gpu: "GPU-first, 0, Same GPU, 0, 0, 1000\nGPU-second, 1, Same GPU, N/A, N/A, N/A"), timestamp: Date())
+        #expect(raw.gpus.count == 2)
+        #expect(raw.gpus.map(\.name) == ["Same GPU", "Same GPU"])
+        #expect(raw.gpus.map(\.id) == ["GPU-first", "GPU-second"])
+        #expect(raw.gpus.map(\.index) == [0, 1])
+        #expect(raw.gpus.first?.utilization == 0)
+        #expect(raw.gpus.last?.utilization == nil)
+        #expect(raw.gpus.last?.memoryTotalBytes == nil)
+    }
+
+    @Test func multipleFilesystemsPreserveRawDFMountPathsAndAvailableCapacity() throws {
+        let disks = #"""
+        /dev/root ext4 2000 500 1400 27% /
+        /dev/data xfs 4000 1000 3000 25% /data sets/with  spaces
+        nas:/export nfs4 8000 2000 6000 25% /mnt/shared data
+        /dev/backslash ext4 1000 100 900 10% /mnt/literal\040data
+        /dev/space ext4 1000 100 900 10% /mnt/literal data
+        /dev/root ext4 2000 500 1400 27% /
+        tmpfs tmpfs 100 0 100 0% /run
+        overlay overlay 2000 500 1400 27% /container
+        """#
+        let output = fixture().replacingOccurrences(of: "/dev/root 2000 500 1500 25% /", with: disks)
+        let snapshot = MetricsCalculator.calculate(current: try MetricsParser.parse(output, timestamp: Date()), previous: nil)
+        #expect(snapshot.disks.map(\.mountPoint) == ["/", "/data sets/with  spaces", "/mnt/shared data", #"/mnt/literal\040data"#, "/mnt/literal data"])
+        #expect(Set(snapshot.disks.map(\.id)).count == 5)
+        let root = try #require(snapshot.disks.first)
+        #expect(root.totalBytes == 2_048_000)
+        #expect(root.usedBytes == 512_000)
+        #expect(root.availableBytes == 1_433_600)
+        #expect(root.utilization == 0.3)
+        #expect(snapshot.disk == 0.25)
+        #expect(snapshot.diskTotalBytes == 2_048_000)
+    }
+
+    @Test func malformedDisksStayUnknownAndZeroUseRemainsValid() throws {
+        let disks = """
+        /dev/zero ext4 2000 0 2000 0% /empty
+        /dev/bad ext4 0 0 0 0% /bad
+        /dev/partial ext4 2000 500 N/A 25% /partial
+        /dev/invalid ext4 2000 3000 4000 90% /invalid
+        /dev/overflow ext4 1e308 1e307 1e307 90% /overflow
+        """
+        let output = fixture().replacingOccurrences(of: "/dev/root 2000 500 1500 25% /", with: disks)
+        let snapshot = MetricsCalculator.calculate(current: try MetricsParser.parse(output, timestamp: Date()), previous: nil)
+        #expect(snapshot.disks.count == 5)
+        #expect(snapshot.disks[0].utilization == 0)
+        #expect(snapshot.disks[0].usedBytes == 0)
+        #expect(snapshot.disks[1].totalBytes == nil)
+        #expect(snapshot.disks[1].usedBytes == nil)
+        #expect(snapshot.disks[1].utilization == nil)
+        #expect(snapshot.disks[2].usedBytes == 512_000)
+        #expect(snapshot.disks[2].availableBytes == nil)
+        #expect(snapshot.disks[2].utilization == nil)
+        #expect(snapshot.disks[3].usedBytes == nil)
+        #expect(snapshot.disks[3].availableBytes == nil)
+        #expect(snapshot.disks[4].totalBytes == nil)
+        #expect(snapshot.disk == nil)
+        #expect(!snapshot.warnings.isEmpty)
+        #expect(DiskReading(id: "x", mountPoint: "/x", totalBytes: .infinity, availableBytes: 0).utilization == nil)
+    }
+
     @Test func testCalculatesIndependentResourceRatiosAndPerInterfaceRate() throws {
         let before = try MetricsParser.parse(fixture(), timestamp: Date(timeIntervalSince1970: 100))
         let after = try MetricsParser.parse(fixture(cpu: "cpu 150 0 150 900 0 0 0 0 50 0", uptime: 102,
@@ -84,11 +146,12 @@ struct MetricsTests {
         expectNil(snapshot.ram); expectNil(snapshot.disk)
         expectFalse(snapshot.warnings.isEmpty)
     }
-    @Test func testCollectorScriptExecutesAgainstLinuxCommandFixtures() async throws {
+    @Test(arguments: ["normal", "timeout", "fallback"])
+    func testCollectorScriptExecutesAgainstLinuxCommandFixtures(mode: String) async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let scripts = [
+        var scripts = [
             "cat": """
             case "$1" in
               /proc/sys/kernel/random/boot_id) printf 'fixture-boot\\n' ;;
@@ -99,9 +162,17 @@ struct MetricsTests {
             esac
             """,
             "head": "[ \"$*\" = '-n 1 /proc/stat' ] || exit 91; printf 'cpu 100 0 100 800 0 0 0 0\\n'",
-            "df": "[ \"$*\" = '-Pk /' ] || exit 92; printf '/dev/root 2000 500 1500 25%% /\\n'",
-            "nvidia-smi": "[ \"$*\" = '--query-gpu=name,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits' ] || exit 93; printf 'GPU, 0, 0, 1000\\n'"
+            "df": "[ \"$1\" = '-PTk' ] || exit 92; shift; [ \"$*\" = '-x tmpfs -x devtmpfs -x overlay -x squashfs -x proc -x sysfs -x cgroup -x cgroup2 -x devpts -x securityfs -x debugfs -x tracefs -x pstore -x configfs -x fusectl -x mqueue -x hugetlbfs -x autofs' ] || exit 92; printf '/dev/root ext4 2000 500 1500 25%% /\\n/dev/data xfs 4000 1000 3000 25%% /data sets\\n'",
+            "nvidia-smi": "[ \"$*\" = '--query-gpu=uuid,index,name,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits' ] || exit 93; printf 'GPU-fixture, 0, GPU, 0, 0, 1000\\n'"
         ]
+        if mode == "fallback" {
+            scripts["df"] = "[ \"$*\" = '-Pk /' ] || exit 92; printf '/dev/root 2000 500 1500 25%% /\\n'"
+        } else if mode == "timeout" {
+            scripts["timeout"] = "[ \"$1\" = '-s' ] && [ \"$2\" = 'KILL' ] && [ \"$3\" = '2' ] && [ \"$4\" = 'df' ] || exit 94; printf '/dev/root ext4 2000 500 1500 25%% /\\n'; exit 124"
+            scripts["df"] = "exit 95" // This mode must run through the disk-specific watchdog.
+        } else {
+            scripts["timeout"] = "[ \"$1\" = '-s' ] && [ \"$2\" = 'KILL' ] && [ \"$3\" = '2' ] || exit 94; shift 3; exec \"$@\""
+        }
         for (name, body) in scripts {
             let url = directory.appendingPathComponent(name)
             try Data(("#!/bin/sh\n" + body).utf8).write(to: url)
@@ -116,8 +187,12 @@ struct MetricsTests {
         expectEqual(snapshot.disk, 0.25)
         expectEqual(snapshot.gpu, 0)
         expectEqual(snapshot.vram, 0)
+        #expect(snapshot.disks.map(\.mountPoint) == (mode == "normal" ? ["/", "/data sets"] : ["/"]))
+        #expect(snapshot.gpus.first?.id == "GPU-fixture")
         expectEqual(snapshot.network.first?.name, "eth0")
-        expectTrue(snapshot.warnings.isEmpty)
+        if mode == "normal" { expectTrue(snapshot.warnings.isEmpty) }
+        else if mode == "timeout" { #expect(snapshot.warnings.contains { $0.contains("timed out") }) }
+        else { #expect(snapshot.warnings.contains { $0.contains("All mounted filesystem") }) }
     }
 
 }

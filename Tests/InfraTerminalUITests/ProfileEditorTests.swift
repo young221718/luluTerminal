@@ -35,3 +35,30 @@ import Testing
         view.subviews.flatMap { [$0] + descendants(of: $0) }
     }
 }
+
+@MainActor struct PasswordInputWarningTests {
+    @Test func koreanSourceWarnsOnlyForTheFocusedAccount() {
+        #expect(PasswordInputWarning.message(password: "", isFocused: true, koreanInputSource: true) != nil)
+        #expect(PasswordInputWarning.message(password: "", isFocused: false, koreanInputSource: true) == nil)
+        #expect(PasswordInputWarning.message(password: "Ascii!123", isFocused: true, koreanInputSource: false) == nil)
+    }
+
+    @Test(arguments: ["한글", "한", "ㄱㅏ", "힣", "ꥠ", "ힰ", "ﾡ"])
+    func composedAndDecomposedHangulWarnEvenAfterLeavingTheField(_ password: String) {
+        #expect(PasswordInputWarning.message(password: password, isFocused: false, koreanInputSource: false) != nil)
+    }
+
+    @Test(arguments: ["", "Abc!@#$%^&*()_+-=123", "spaces are preserved", "é日本語🙂"])
+    func otherCharactersDoNotTriggerAHangulWarning(_ password: String) {
+        #expect(PasswordInputWarning.message(password: password, isFocused: true, koreanInputSource: false) == nil)
+    }
+
+    @Test func sourceLanguageAndASCIICapabilityDistinguishKoreanRomanMode() {
+        #expect(PasswordInputWarning.isKoreanInputSource(languages: ["ko"], isASCIICapable: false))
+        #expect(PasswordInputWarning.isKoreanInputSource(languages: ["ko-KR"], isASCIICapable: false))
+        #expect(!PasswordInputWarning.isKoreanInputSource(languages: ["ko"], isASCIICapable: true))
+        #expect(!PasswordInputWarning.isKoreanInputSource(languages: ["en"], isASCIICapable: true))
+        #expect(!PasswordInputWarning.isKoreanInputSource(languages: ["ja"], isASCIICapable: false))
+        #expect(!PasswordInputWarning.isKoreanInputSource(languages: [], isASCIICapable: false))
+    }
+}

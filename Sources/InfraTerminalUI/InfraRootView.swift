@@ -98,6 +98,7 @@ public struct InfraRootView: View {
                 try await model.saveProfile(profile, passwords: passwords)
                 for tab in model.workspace.tabs where tab.serverID == profile.id { terminal.disconnect(id: tab.id) }
             }
+            .id(editingProfile?.id)
         }
         .sheet(isPresented: $showNewTab) {
             if let server = model.selectedServer {

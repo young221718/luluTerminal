@@ -131,6 +131,21 @@ import Testing
         host.disconnectAll()
     }
 
+    @Test func commandEnvironmentReachesSurfaceWithoutReplacingExistingTab() throws {
+        let host = TerminalHost()
+        let id = UUID()
+        let environment = ["SSH_ASKPASS": "/Applications/luluTerminal.app/Contents/Helpers/luluTerminalAskPass", "SSH_ASKPASS_REQUIRE": "force"]
+        host.open(id: id, command: "/usr/bin/true", environment: environment)
+        defer { host.disconnectAll() }
+        let view = try #require(host.view(for: id))
+        #expect(view.configuration.envVars["TERM"] == "xterm-256color")
+        #expect(view.configuration.envVars["SSH_ASKPASS"] == environment["SSH_ASKPASS"])
+        #expect(view.configuration.envVars["SSH_ASKPASS_REQUIRE"] == "force")
+        host.open(id: id, command: "/usr/bin/false", environment: [:])
+        #expect(host.view(for: id) === view)
+        #expect(view.configuration.envVars["SSH_ASKPASS_REQUIRE"] == "force")
+    }
+
     @Test func disconnectReleasesOnlyTheNamedSurface() {
         let host = TerminalHost()
         let a = UUID(), b = UUID()

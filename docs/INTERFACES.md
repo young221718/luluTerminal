@@ -6,7 +6,8 @@
 ```swift
 struct SSHAccount: Identifiable, Codable, Equatable, Sendable {
   var id: UUID; var username: String
-  init(id: UUID = UUID(), username: String)
+  var authMethod: SSHAuthenticationMethod; var credential: SSHPasswordReference?
+  init(id: UUID = UUID(), username: String, authMethod: SSHAuthenticationMethod = .system, credential: SSHPasswordReference? = nil)
 }
 enum ServerConnectionKind: String, Codable, Sendable { case ssh, local }
 struct ServerProfile: Identifiable, Codable, Equatable, Sendable {
@@ -38,8 +39,8 @@ struct StateStore {
   func save(_ state: WorkspaceState) throws
 }
 struct ShellCommand: Sendable {
-  var executable: String; var arguments: [String]; var standardInput: String?
-  init(executable: String, arguments: [String], standardInput: String? = nil)
+  var executable: String; var arguments: [String]; var standardInput: String?; var environment: [String: String]
+  init(executable: String, arguments: [String], standardInput: String? = nil, environment: [String: String] = [:])
   var shellString: String { get } // correctly quoted for Ghostty command
 }
 enum LocalMachine {
@@ -90,7 +91,7 @@ TerminalBridge module interface supplied by root:
 @MainActor public final class TerminalHost: ObservableObject {
   public init()
   public var error: String? { get }
-  public func open(id: UUID, command: String) // preserve existing surface for same id
+  public func open(id: UUID, command: String, environment: [String: String] = [:]) // preserve existing surface for same id
   public func disconnect(id: UUID) // releases local surface only
   public func disconnectAll()
 }
@@ -105,3 +106,6 @@ UI module entry `InfraRootView()` exposed public; App main calls it. Settings ca
 연결 라우팅: `kind`가 없는 기존 v1 프로필은 `ssh`로 decode한다. `local`은 예약된 단일 Mac 프로필에만 허용하며 SSH builder는 모두 거부한다. AppModel은 로컬 셸과 지표를 직접 라우팅하고 선택한 로컬 탭만 자동으로 셸을 연다. 원격 SSH/tmux 세션은 명시적인 사용자 동작에서만 연다.
 
 로컬 셸의 홈·실행 경로는 고정 스크립트의 위치 인자로 전달한다. 로컬 CPU는 두 표본 차분, RAM은 캐시를 포함한 active+inactive+wired+compressed 페이지, 디스크는 홈의 단일 볼륨 용량이다. APFS 공유 용량을 여러 볼륨에서 합산하지 않는다. 로컬 GPU/VRAM/네트워크는 nil 또는 빈 배열로 미지원 상태를 유지한다.
+
+
+저장 비밀번호 인증은 `SSHPasswordAuthentication.resolveTarget`으로 SSH 별칭을 확인하고, `context`로 저장 대상 일치를 검증한 뒤 `SSHCommandBuilder`의 `authentication` 인자로 전달한다. `manualAuthentication: true`는 기존 대화형 인증 경로다. `PasswordCredentialStore`는 키체인 저장·읽기·삭제의 테스트 경계이며 JSON 모델은 비밀번호를 포함하지 않는다. `ShellCommand.environment`는 비밀 없는 askpass 경로와 대상 참조만 전달한다. 앱 실행파일의 `--ssh-askpass` 진입점은 SwiftUI 초기화 전에 처리한다.

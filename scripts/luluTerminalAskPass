@@ -1,0 +1,3 @@
+#!/bin/sh
+# Keep Keychain access in the app executable; no UI is initialized in this mode.
+exec "$(dirname "$0")/../MacOS/InfraTerminal" --ssh-askpass "$@"

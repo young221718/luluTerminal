@@ -22,7 +22,7 @@ let package = Package(
         .testTarget(name: "TerminalBridgeTests", dependencies: ["TerminalBridge"])
     ]) + (coreOnly || bridgeOnly ? [] : [
         .target(name: "InfraTerminalUI", dependencies: ["InfraCore", "TerminalBridge"]),
-        .executableTarget(name: "InfraTerminalApp", dependencies: ["InfraTerminalUI", "TerminalBridge"]),
+        .executableTarget(name: "InfraTerminalApp", dependencies: ["InfraTerminalUI", "TerminalBridge", "InfraCore"]),
         .testTarget(name: "InfraTerminalUITests", dependencies: ["InfraTerminalUI"])
     ]),
     swiftLanguageModes: [.v5]

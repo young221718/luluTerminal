@@ -21,6 +21,13 @@ public final class AppModel: ObservableObject {
     private let store: StateStore
     typealias CommandExecutor = @Sendable (ShellCommand, TimeInterval) async throws -> ProcessResult
     private let execute: CommandExecutor
+    private let credentialStore: any PasswordCredentialStore
+    private let helperPath: String?
+    private struct AccountKey: Hashable { let serverID: UUID; let accountID: UUID }
+    private var pausedAuthentication: Set<AccountKey> = []
+    private var activeAuthentication: Set<AccountKey> = []
+    private var passwordTerminalAccounts: [UUID: AccountKey] = [:]
+    private var savingProfiles: Set<UUID> = []
     private var previous: [UUID: RawMetrics] = [:]
     private var lastAttempts: [UUID: Date] = [:]
     private var polls: [UUID: Task<Void, Never>] = [:]
@@ -51,9 +58,12 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    init(demo: Bool, storeURL: URL?, execute: @escaping CommandExecutor) {
+    init(demo: Bool, storeURL: URL?, credentialStore: any PasswordCredentialStore = KeychainCredentialStore(),
+         helperPath: String? = SSHPasswordAuthentication.helperPath, execute: @escaping CommandExecutor) {
         self.isDemo = demo
         self.execute = execute
+        self.credentialStore = credentialStore
+        self.helperPath = helperPath
         self.storeURL = storeURL ?? Self.defaultStoreURL
         self.store = StateStore(url: self.storeURL)
         if demo {
@@ -84,40 +94,125 @@ public final class AppModel: ObservableObject {
     func closeTab(_ id: UUID) { workspace.close(tabID: id); disconnected(id); persist() }
     func reopenTab(_ id: UUID) { workspace.reopen(tabID: id); persist() }
     func disconnected(_ id: UUID) {
+        passwordTerminalAccounts[id] = nil
         connectionTokens[id] = nil
         connectionChecks.removeValue(forKey: id)?.cancel()
         connections[id] = .disconnected
     }
 
+    func terminalExited(_ id: UUID) {
+        if let key = passwordTerminalAccounts.removeValue(forKey: id) {
+            pausedAuthentication.insert(key)
+            collectionErrors[key.serverID] = "SSH 연결 확인 필요. 다시 연결하거나 서버 설정에서 비밀번호를 확인하세요."
+        }
+        disconnected(id)
+    }
+
     func saveProfile(_ profile: ServerProfile) throws {
+        try validateProfileEdit(profile)
+        for account in profile.accounts where account.authMethod == .password {
+            guard let reference = account.credential, reference.target.matches(server: profile, account: account) else {
+                throw UIError.message("연결 대상이 바뀌었습니다. 이 계정의 비밀번호를 다시 입력하세요.")
+            }
+        }
+        try commitProfile(profile)
+    }
+
+    func saveProfile(_ draft: ServerProfile, passwords: [UUID: String]) async throws {
+        try validateProfileEdit(draft)
+        guard !savingProfiles.contains(draft.id) else { throw UIError.message("이 서버의 설정을 저장하는 중입니다.") }
+        if isDemo {
+            guard passwords.values.allSatisfy({ $0.isEmpty }), draft.accounts.allSatisfy({ $0.authMethod == .system && $0.credential == nil }) else {
+                throw UIError.message("데모에서는 비밀번호를 키체인에 저장하지 않습니다.")
+            }
+            try commitProfile(draft)
+            return
+        }
+        savingProfiles.insert(draft.id)
+        defer { savingProfiles.remove(draft.id) }
+        let original = workspace.servers.first { $0.id == draft.id }
+        var profile = draft
+        var created: [SSHPasswordReference] = []
+        do {
+            for index in profile.accounts.indices {
+                var account = profile.accounts[index]
+                if account.authMethod == .system {
+                    account.credential = nil
+                } else if let password = passwords[account.id], !password.isEmpty {
+                    let target = try await SSHPasswordAuthentication.resolveTarget(server: profile, account: account, execute: execute)
+                    let reference = SSHPasswordReference(target: target)
+                    // A new reference keeps the old secret intact until the state file commits.
+                    try credentialStore.save(password, reference: reference)
+                    created.append(reference)
+                    account.credential = reference
+                } else {
+                    guard let reference = account.credential, reference.target.matches(server: profile, account: account) else {
+                        throw UIError.message("이 연결 대상의 비밀번호를 입력하세요.")
+                    }
+                }
+                profile.accounts[index] = account
+            }
+            guard workspace.servers.first(where: { $0.id == draft.id }) == original else {
+                throw UIError.message("저장 중 서버 설정이 변경되었습니다. 다시 확인하세요.")
+            }
+            try validateProfileEdit(profile)
+            try commitProfile(profile)
+        } catch {
+            for reference in created {
+                do { try credentialStore.delete(reference: reference) }
+                catch { persistenceError = "저장 실패 후 새 키체인 항목 정리에 실패했습니다. 키체인 접근에서 luluTerminal 항목을 확인하세요." }
+            }
+            throw error
+        }
+        let retained = Set(profile.accounts.compactMap { $0.credential?.id })
+        for reference in original?.accounts.compactMap(\.credential) ?? [] where !retained.contains(reference.id) {
+            do { try credentialStore.delete(reference: reference) }
+            catch { persistenceError = "설정은 저장했지만 이전 비밀번호를 키체인에서 삭제하지 못했습니다. 키체인 접근에서 luluTerminal 항목을 확인하세요." }
+        }
+    }
+
+    private func validateProfileEdit(_ profile: ServerProfile) throws {
+        guard !persistenceBlocked else { throw UIError.message(persistenceError ?? "저장 파일 복구 전에는 설정을 저장할 수 없습니다.") }
         guard profile.kind == .ssh, profile.id != LocalMachine.serverID else {
             throw UIError.message("이 Mac은 기본 로컬 항목이므로 서버 편집으로 변경할 수 없습니다.")
         }
         try profile.validate()
-        if let index = workspace.servers.firstIndex(where: { $0.id == profile.id }) {
-            let old = workspace.servers[index]
+        if let old = workspace.servers.first(where: { $0.id == profile.id }) {
             for account in old.accounts where workspace.tabs.contains(where: { $0.serverID == old.id && $0.accountID == account.id }) {
                 guard profile.accounts.first(where: { $0.id == account.id })?.username == account.username else {
                     throw UIError.message("열린 탭 또는 닫힌 탭이 사용하는 계정은 변경하거나 삭제할 수 없습니다. 새 계정을 추가하세요.")
                 }
             }
-            workspace.servers[index] = profile
-            for tab in workspace.tabs where tab.serverID == profile.id { disconnected(tab.id) }
-            let oldMonitor = old.accounts.first { $0.id == old.monitorAccountID }?.username
-            let newMonitor = profile.accounts.first { $0.id == profile.monitorAccountID }?.username
+        }
+    }
+
+    private func commitProfile(_ profile: ServerProfile) throws {
+        let old = workspace.servers.first { $0.id == profile.id }
+        var candidate = workspace
+        if let index = candidate.servers.firstIndex(where: { $0.id == profile.id }) { candidate.servers[index] = profile }
+        else { candidate.servers.append(profile); candidate.select(serverID: profile.id) }
+        try candidate.validate()
+        if !isDemo {
+            do { try store.save(candidate); persistenceError = nil }
+            catch { persistenceError = "저장 실패: \(error.localizedDescription)\n\(storeURL.path)"; throw error }
+        }
+        workspace = candidate
+        for tab in workspace.tabs where tab.serverID == profile.id { disconnected(tab.id) }
+        if let old {
+            let oldMonitor = old.accounts.first { $0.id == old.monitorAccountID }
+            let newMonitor = profile.accounts.first { $0.id == profile.monitorAccountID }
             if old.host != profile.host || old.port != profile.port || old.monitorAccountID != profile.monitorAccountID || oldMonitor != newMonitor {
                 previous[profile.id] = nil
-                lastAttempts[profile.id] = nil
                 metrics[profile.id] = nil
                 histories[profile.id] = nil
                 collectionErrors[profile.id] = nil
             }
-            polls[profile.id]?.cancel()
-        } else {
-            workspace.servers.append(profile)
-            workspace.select(serverID: profile.id)
         }
-        persist()
+        lastAttempts[profile.id] = nil
+        if old?.accounts != profile.accounts || old?.host != profile.host || old?.port != profile.port {
+            pausedAuthentication = pausedAuthentication.filter { $0.serverID != profile.id }
+        }
+        polls[profile.id]?.cancel()
     }
 
     @discardableResult
@@ -147,33 +242,67 @@ public final class AppModel: ObservableObject {
         persist()
     }
 
-    func prepareConnection(tabID: UUID, create: Bool, probeExisting: Bool = true) async -> ShellCommand? {
+    func prepareConnection(tabID: UUID, create: Bool, probeExisting: Bool = true,
+                           retryAuthentication: Bool = false, manualAuthentication: Bool = false) async -> ShellCommand? {
         guard let tab = workspace.tabs.first(where: { $0.id == tabID && !$0.isClosed }),
               let server = workspace.servers.first(where: { $0.id == tab.serverID }), let account = account(for: tab) else { return nil }
         guard server.kind == .local || !isDemo else { return nil }
         guard connections[tabID] != .checking else { return nil }
+        let key = AccountKey(serverID: server.id, accountID: account.id)
+        let savedPassword = server.kind == .ssh && account.authMethod == .password && !manualAuthentication
         let token = UUID()
+        var ownsAuthentication = false
         connectionTokens[tabID] = token
         connections[tabID] = .checking
-        defer { if connectionTokens[tabID] == token { connectionChecks[tabID] = nil } }
+        defer {
+            if ownsAuthentication { activeAuthentication.remove(key) }
+            if connectionTokens[tabID] == token { connectionChecks[tabID] = nil }
+        }
         do {
             if server.kind == .local {
                 let command = try LocalMachine.terminal()
                 connections[tabID] = .launched
                 return command
             }
-            if !create && probeExisting {
-                let probe = try SSHCommandBuilder.probe(server: server, account: account, tab: tab)
+            if account.authMethod == .password {
+                if let poll = polls[server.id] { await poll.value }
+                guard connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
+                if retryAuthentication { pausedAuthentication.remove(key); collectionErrors[server.id] = nil }
+                if savedPassword {
+                    guard !activeAuthentication.contains(key) else {
+                        connections[tabID] = .failed("이 계정의 SSH 연결을 확인하고 있습니다. 잠시 후 다시 시도하세요.")
+                        return nil
+                    }
+                    guard !pausedAuthentication.contains(key) else {
+                        connections[tabID] = .authenticationRequired("SSH 연결 확인 필요. 저장한 비밀번호로 다시 시도하거나 터미널에서 직접 인증하세요.")
+                        return nil
+                    }
+                    activeAuthentication.insert(key)
+                    ownsAuthentication = true
+                }
+            }
+            let authentication: SSHAuthenticationContext?
+            if savedPassword {
+                guard let helperPath else { throw UIError.message("비밀번호 연결 도우미가 없습니다. 앱을 다시 설치하세요.") }
+                authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, execute: execute)
+            } else { authentication = nil }
+            guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
+                  workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
+            // Explicit creation authenticates first; exit 44 means the requested session is absent.
+            if (!create && probeExisting) || savedPassword {
+                let probe = try SSHCommandBuilder.probe(server: server, account: account, tab: tab, authentication: authentication, manualAuthentication: manualAuthentication)
                 let execute = self.execute
                 let check = Task { try await execute(probe, 8) }
                 connectionChecks[tabID] = check
                 let result = try await check.value
                 guard connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
-                guard result.exitCode == 0 else {
+                guard result.exitCode == 0 || (create && result.exitCode == 44) else {
                     switch result.exitCode {
                     case 44: connections[tabID] = .missing
                     case 127: connections[tabID] = .failed("원격 tmux가 설치되어 있지 않습니다.")
-                    case 255: connections[tabID] = .authenticationRequired("SSH 사전 확인 실패. 터미널에서 인증하고 연결할 수 있습니다.\n\(String(result.stderr.prefix(600)))")
+                    case 255:
+                        if savedPassword { pausedAuthentication.insert(key) }
+                        connections[tabID] = .authenticationRequired("SSH 연결 확인 필요. 터미널에서 인증하고 연결할 수 있습니다.\n\(String(result.stderr.prefix(600)))")
                     default: connections[tabID] = .failed("SSH 세션 확인 실패 (\(result.exitCode)). \(String(result.stderr.prefix(600)))")
                     }
                     return nil
@@ -181,11 +310,21 @@ public final class AppModel: ObservableObject {
             }
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
                   workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
-            let command = try SSHCommandBuilder.terminal(server: server, account: account, tab: tab, create: create)
+            let command = try SSHCommandBuilder.terminal(server: server, account: account, tab: tab, create: create,
+                                                        authentication: authentication, manualAuthentication: manualAuthentication)
+            if savedPassword {
+                passwordTerminalAccounts[tab.id] = key
+                lastAttempts[server.id] = Date().addingTimeInterval(10)
+            } else { passwordTerminalAccounts[tab.id] = nil }
             connections[tabID] = .launched
             return command
         } catch {
-            if connectionTokens[tabID] == token { connections[tabID] = .failed(error.localizedDescription) }
+            if connectionTokens[tabID] == token {
+                if savedPassword {
+                    pausedAuthentication.insert(key)
+                    connections[tabID] = .authenticationRequired("SSH 연결 확인 필요. \(error.localizedDescription)")
+                } else { connections[tabID] = .failed(error.localizedDescription) }
+            }
             return nil
         }
     }
@@ -232,7 +371,7 @@ public final class AppModel: ObservableObject {
         guard monitoringEnabled, !isDemo else { return [] }
         let slots = max(0, 3 - polls.count)
         return workspace.servers
-            .filter { $0.kind == .ssh && $0.monitoringEnabled && $0.monitorAccountID != nil && polls[$0.id] == nil && now.timeIntervalSince(lastAttempts[$0.id] ?? .distantPast) >= pollInterval(for: $0.id) }
+            .filter { $0.kind == .ssh && $0.monitoringEnabled && $0.monitorAccountID != nil && polls[$0.id] == nil && !self.isAuthenticationUnavailable(server: $0) && now.timeIntervalSince(lastAttempts[$0.id] ?? .distantPast) >= pollInterval(for: $0.id) }
             .sorted { lhs, rhs in
                 let leftSelected = lhs.id == workspace.selectedServerID
                 let rightSelected = rhs.id == workspace.selectedServerID
@@ -241,26 +380,56 @@ public final class AppModel: ObservableObject {
             }
             .prefix(slots).map(\.id)
     }
+    private func isAuthenticationUnavailable(server: ServerProfile) -> Bool {
+        guard let account = server.accounts.first(where: { $0.id == server.monitorAccountID }), account.authMethod == .password else { return false }
+        let key = AccountKey(serverID: server.id, accountID: account.id)
+        return pausedAuthentication.contains(key) || activeAuthentication.contains(key) || savingProfiles.contains(server.id)
+    }
+
     private func poll(_ id: UUID, at time: Date) {
         guard let server = workspace.servers.first(where: { $0.id == id }), let account = server.accounts.first(where: { $0.id == server.monitorAccountID }) else { return }
+        let key = AccountKey(serverID: server.id, accountID: account.id)
+        let savedPassword = account.authMethod == .password
+        guard !savedPassword || !isAuthenticationUnavailable(server: server) else { return }
+        if savedPassword { activeAuthentication.insert(key) }
         lastAttempts[id] = time
         polls[id] = Task { [weak self] in
             guard let self else { return }
-            defer { self.polls[id] = nil }
+            defer {
+                self.polls[id] = nil
+                if savedPassword { self.activeAuthentication.remove(key) }
+            }
+            var receivedResult = false
             do {
-                let result = try await self.execute(SSHCommandBuilder.monitor(server: server, account: account), 8)
+                let authentication: SSHAuthenticationContext?
+                if savedPassword {
+                    guard let helperPath = self.helperPath else { throw UIError.message("비밀번호 연결 도우미가 없습니다. 앱을 다시 설치하세요.") }
+                    authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, execute: self.execute)
+                } else { authentication = nil }
                 guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
-                guard result.exitCode == 0 else { throw UIError.message("수집 실패 (\(result.exitCode)): \(String(result.stderr.prefix(400)))") }
+                let result = try await self.execute(SSHCommandBuilder.monitor(server: server, account: account, authentication: authentication), 8)
+                receivedResult = true
+                guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
+                guard result.exitCode == 0 else {
+                    if savedPassword && result.exitCode == 255 { self.pausedAuthentication.insert(key) }
+                    throw UIError.message(savedPassword && result.exitCode == 255
+                        ? "SSH 연결 확인 필요. 자동 인증을 멈췄습니다. 다시 연결하거나 서버 설정에서 비밀번호를 확인하세요."
+                        : "수집 실패 (\(result.exitCode)): \(String(result.stderr.prefix(400)))")
+                }
                 let raw = try MetricsParser.parse(result.stdout, timestamp: Date())
                 let snapshot = MetricsCalculator.calculate(current: raw, previous: self.previous[id])
                 self.previous[id] = raw
                 self.record(snapshot, for: id)
                 self.collectionErrors[id] = nil
             } catch {
-                if !Task.isCancelled { self.collectionErrors[id] = error.localizedDescription }
+                if !Task.isCancelled, self.workspace.servers.contains(server) {
+                    if savedPassword && !receivedResult { self.pausedAuthentication.insert(key) }
+                    self.collectionErrors[id] = error.localizedDescription
+                }
             }
         }
     }
+
     private func persist() {
         guard !isDemo, !persistenceBlocked else { return }
         do { try store.save(workspace); persistenceError = nil }

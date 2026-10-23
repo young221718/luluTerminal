@@ -49,7 +49,7 @@ open 'dist/Infra Terminal.app'
 
 상태 파일은 `~/Library/Application Support/InfraTerminal/workspace-v1.json`에 저장한다. 연결 종류가 없는 기존 v1 프로필은 SSH로, 인증 방식이 없는 계정은 기존 SSH 키·설정 방식으로 읽는다. 비밀번호 원문은 상태 JSON에 넣지 않는다. 손상 파일을 기본값으로 덮어쓰지 않으며 오류와 복구 경로를 표시한다. 기존 SSH 탭이 사용하는 계정 이름은 변경할 수 없으므로 다른 사용자는 새 계정으로 추가한다.
 
-동작 계약은 [SPEC](docs/SPEC.md), 작업 간 API는 [INTERFACES](docs/INTERFACES.md), 엔진 출처·라이선스는 [THIRD_PARTY](docs/THIRD_PARTY.md)에 기록했다.
+동작 계약은 [SPEC](docs/SPEC.md), 모듈 경계는 [INTERFACES](docs/INTERFACES.md), 검사 책임과 실행법은 [TESTING](docs/TESTING.md), 실제 결과는 [VERIFICATION](docs/VERIFICATION.md)에 기록했다. [Ansible 연동 설계안](docs/ANSIBLE_DESIGN.md)은 기존 프로젝트·전용 실행 터미널 중심의 검토용 제안이며 아직 구현되지 않았다. 엔진 출처·라이선스는 [THIRD_PARTY](docs/THIRD_PARTY.md)를 따른다.
 한국어 IME 조합 입력, VoiceOver, 네트워크 장애·장시간 수집은 추가 수락 검증 대상이다. 빌드한 앱은 ad-hoc 서명이며 Developer ID 서명·공증·자동 업데이트를 제공하지 않는다. 저장 데이터와 기존 앱 호환성을 위해 내부 실행파일·bundle 식별자·빌드 결과 경로는 InfraTerminal 이름을 유지한다.
 
 ## 보안과 라이선스

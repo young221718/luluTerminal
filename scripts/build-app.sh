@@ -8,6 +8,7 @@ app="$PWD/dist/Infra Terminal.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources/Licenses"
 cp "$bin_dir/InfraTerminal" "$app/Contents/MacOS/InfraTerminal"
 install -m 755 scripts/luluTerminalAskPass "$app/Contents/Helpers/luluTerminalAskPass"
+bash scripts/build-askpass-helper.sh "$app/Contents/Helpers/luluTerminalKeychain"
 bash scripts/make-icon.sh Resources/AppIcon.png "$app/Contents/Resources/AppIcon.icns"
 for resource in "$bin_dir"/*.bundle; do
     [ -d "$resource" ] || continue
@@ -44,5 +45,8 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
   <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST
-codesign --force --deep --sign - "$app"
+# Sign the wrapper separately; preserve the already signed Keychain helper.
+codesign --force --sign - "$app/Contents/Helpers/luluTerminalAskPass"
+codesign --force --sign - "$app"
+codesign --verify --deep --strict "$app"
 printf '%s\n' "$app"

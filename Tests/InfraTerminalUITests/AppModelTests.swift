@@ -314,6 +314,46 @@ struct AppModelTests {
         #expect(model.connections[tab.id]?.label.contains("SSH 연결 확인 필요") == true)
     }
 
+    @Test func testKeychainDenialPausesCollectionWithoutRequestingANewPassword() async throws {
+        let store = TestPasswordStore()
+        let recorder = PasswordFailureRecorder(stderr: SSHPasswordAuthentication.keychainAccessRequiredMarker)
+        let model = AppModel(demo: false, storeURL: temporaryURL(), credentialStore: store, helperPath: "/usr/bin/true") { command, timeout in
+            if command.arguments.contains("-G") { return try await passwordFixture(command, timeout) }
+            return await recorder.run(command)
+        }
+        var profile = server()
+        profile.accounts[0].authMethod = .password
+        try await model.saveProfile(profile, passwords: [profile.accounts[0].id: "fixture-secret"])
+        model.tick(at: Date())
+        try await waitUntil { model.collectionErrors[profile.id] != nil }
+        #expect(model.collectionErrors[profile.id]?.contains("키체인 접근 허용") == true)
+        #expect(model.dueServerIDs(now: Date().addingTimeInterval(120)).isEmpty)
+        #expect(await recorder.commands.count == 1)
+        #expect(store.saved.count == 1 && store.deleted.isEmpty)
+    }
+
+    @Test func testOnlyExplicitPasswordConnectionsMayAskForKeychainAccess() async throws {
+        let store = TestPasswordStore()
+        let recorder = PasswordSuccessRecorder()
+        let model = AppModel(demo: false, storeURL: temporaryURL(), credentialStore: store, helperPath: "/usr/bin/true") { command, timeout in
+            if command.arguments.contains("-G") { return try await passwordFixture(command, timeout) }
+            return await recorder.run(command)
+        }
+        var profile = server()
+        profile.accounts[0].authMethod = .password
+        try await model.saveProfile(profile, passwords: [profile.accounts[0].id: "fixture-secret"])
+        let tab = try model.addTab(serverID: profile.id, accountID: profile.accounts[0].id, title: "Retained")
+        let terminal = try #require(await model.prepareConnection(tabID: tab.id, create: false))
+        #expect(await recorder.commands.first?.environment["LULUTERMINAL_KEYCHAIN_UI"] == "allow")
+        #expect(terminal.environment["LULUTERMINAL_KEYCHAIN_UI"] == "allow")
+        model.tick(at: Date().addingTimeInterval(30))
+        try await waitUntil { model.collectionErrors[profile.id] != nil }
+        let commands = await recorder.commands
+        #expect(commands.count == 2)
+        #expect(commands.last?.standardInput == LinuxCollector.script)
+        #expect(commands.last?.environment["LULUTERMINAL_KEYCHAIN_UI"] == "fail")
+    }
+
     @Test func testPasswordProbeWaitsForCollectorAndManualFallbackDoesNotRetrySecret() async throws {
         let store = TestPasswordStore()
         let collector = SuspendedCollector()
@@ -500,9 +540,19 @@ private let passwordFixture: SSHCommandExecutor = { command, timeout in
 }
 
 private actor PasswordFailureRecorder {
+    private let stderr: String
+    init(stderr: String = "fixture SSH failure") { self.stderr = stderr }
     private(set) var commands: [ShellCommand] = []
     func run(_ command: ShellCommand) -> ProcessResult {
         commands.append(command)
-        return ProcessResult(exitCode: 255, stdout: "", stderr: "fixture SSH failure")
+        return ProcessResult(exitCode: 255, stdout: "", stderr: stderr)
+    }
+}
+
+private actor PasswordSuccessRecorder {
+    private(set) var commands: [ShellCommand] = []
+    func run(_ command: ShellCommand) -> ProcessResult {
+        commands.append(command)
+        return ProcessResult(exitCode: 0, stdout: "", stderr: "")
     }
 }

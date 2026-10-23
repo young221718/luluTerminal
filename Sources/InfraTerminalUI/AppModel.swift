@@ -301,7 +301,7 @@ public final class AppModel: ObservableObject {
             let authentication: SSHAuthenticationContext?
             if savedPassword {
                 guard let helperPath else { throw UIError.message("비밀번호 연결 도우미가 없습니다. 앱을 다시 설치하세요.") }
-                authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, execute: execute)
+                authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, allowsKeychainInteraction: true, execute: execute)
             } else { authentication = nil }
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
                   workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
@@ -319,7 +319,9 @@ public final class AppModel: ObservableObject {
                     case 127: connections[tabID] = .failed("원격 tmux가 설치되어 있지 않습니다.")
                     case 255:
                         if savedPassword { pausedAuthentication.insert(key) }
-                        connections[tabID] = .authenticationRequired("SSH 연결 확인 필요. 터미널에서 인증하고 연결할 수 있습니다.\n\(String(result.stderr.prefix(600)))")
+                        connections[tabID] = .authenticationRequired(result.stderr.contains(SSHPasswordAuthentication.keychainAccessRequiredMarker)
+                            ? SSHPasswordError.keychainAccessRequired.localizedDescription
+                            : "SSH 연결 확인 필요. 터미널에서 인증하고 연결할 수 있습니다.\n\(String(result.stderr.prefix(600)))")
                     default: connections[tabID] = .failed("SSH 세션 확인 실패 (\(result.exitCode)). \(String(result.stderr.prefix(600)))")
                     }
                     return nil
@@ -327,6 +329,8 @@ public final class AppModel: ObservableObject {
             }
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
                   workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
+            // Probe and terminal use separate SSH processes. Allow Once for the probe
+            // must not leave the explicit terminal request unable to ask for access.
             let command = try SSHCommandBuilder.terminal(server: server, account: account, tab: tab, create: create,
                                                         authentication: authentication, manualAuthentication: manualAuthentication)
             if savedPassword {
@@ -429,6 +433,9 @@ public final class AppModel: ObservableObject {
                 guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
                 guard result.exitCode == 0 else {
                     if savedPassword && result.exitCode == 255 { self.pausedAuthentication.insert(key) }
+                    if savedPassword && result.stderr.contains(SSHPasswordAuthentication.keychainAccessRequiredMarker) {
+                        throw SSHPasswordError.keychainAccessRequired
+                    }
                     throw UIError.message(savedPassword && result.exitCode == 255
                         ? "SSH 연결 확인 필요. 자동 인증을 멈췄습니다. 다시 연결하거나 서버 설정에서 비밀번호를 확인하세요."
                         : "수집 실패 (\(result.exitCode)): \(String(result.stderr.prefix(400)))")

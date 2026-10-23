@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import Security
 
 public typealias SSHCommandExecutor = @Sendable (ShellCommand, TimeInterval) async throws -> ProcessResult
 
@@ -28,22 +29,33 @@ public struct SSHPasswordReference: Codable, Equatable, Sendable {
 
 public enum SSHPasswordError: Error, LocalizedError {
     case message(String)
-    public var errorDescription: String? { if case .message(let value) = self { return value }; return nil }
+    case keychainAccessRequired
+    public var errorDescription: String? {
+        switch self {
+        case .message(let value): return value
+        case .keychainAccessRequired: return "키체인 접근 허용이 필요합니다. 서버 연결을 다시 시도하세요. 자동 연결을 계속 사용하려면 ‘luluTerminalKeychain’ 요청에서 ‘항상 허용’을 선택하세요."
+        }
+    }
 }
 
 public struct SSHAuthenticationContext: Sendable {
     public let reference: SSHPasswordReference
     public let helperPath: String
-    public init(reference: SSHPasswordReference, helperPath: String) { self.reference = reference; self.helperPath = helperPath }
+    public let allowsKeychainInteraction: Bool
+    public init(reference: SSHPasswordReference, helperPath: String, allowsKeychainInteraction: Bool = false) {
+        self.reference = reference; self.helperPath = helperPath; self.allowsKeychainInteraction = allowsKeychainInteraction
+    }
     public var environment: [String: String] {
         // The reference contains destination metadata only; the password stays in Keychain.
         let data = try! JSONEncoder().encode(reference)
         return ["SSH_ASKPASS": helperPath, "SSH_ASKPASS_REQUIRE": "force", "LC_ALL": "C",
-                "LULUTERMINAL_SSH_REFERENCE": data.base64EncodedString()]
+                "LULUTERMINAL_SSH_REFERENCE": data.base64EncodedString(),
+                "LULUTERMINAL_KEYCHAIN_UI": allowsKeychainInteraction ? "allow" : "fail"]
     }
 }
 
 public enum SSHPasswordAuthentication {
+    public static let keychainAccessRequiredMarker = "LULUTERMINAL_KEYCHAIN_ACCESS_REQUIRED"
     public static var helperPath: String? {
         let path = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/luluTerminalAskPass").path
         return FileManager.default.isExecutableFile(atPath: path) ? path : nil
@@ -73,7 +85,7 @@ public enum SSHPasswordAuthentication {
         return SSHPasswordTarget(server: server, account: account, resolvedHost: hostname)
     }
 
-    public static func context(server: ServerProfile, account: SSHAccount, helperPath: String, execute: SSHCommandExecutor) async throws -> SSHAuthenticationContext {
+    public static func context(server: ServerProfile, account: SSHAccount, helperPath: String, allowsKeychainInteraction: Bool = false, execute: SSHCommandExecutor) async throws -> SSHAuthenticationContext {
         guard account.authMethod == .password, let reference = account.credential,
               reference.target.matches(server: server, account: account) else {
             throw SSHPasswordError.message("이 연결 대상의 비밀번호를 다시 저장하세요.")
@@ -81,7 +93,7 @@ public enum SSHPasswordAuthentication {
         let target = try await resolveTarget(server: server, account: account, execute: execute)
         guard reference.target == target else { throw SSHPasswordError.message("SSH 별칭의 연결 대상이 바뀌었습니다. 비밀번호를 다시 저장하세요.") }
         guard FileManager.default.isExecutableFile(atPath: helperPath) else { throw SSHPasswordError.message("비밀번호 연결 도우미가 없습니다. 앱을 다시 설치하세요.") }
-        return SSHAuthenticationContext(reference: reference, helperPath: helperPath)
+        return SSHAuthenticationContext(reference: reference, helperPath: helperPath, allowsKeychainInteraction: allowsKeychainInteraction)
     }
 
     public static func validateAskpass(prompt: String, reference: SSHPasswordReference, parentExecutable: String) -> Bool {
@@ -99,10 +111,16 @@ public enum SSHPasswordAuthentication {
         guard proc_pidpath(getppid(), &path, UInt32(path.count)) > 0,
               validateAskpass(prompt: arguments[2], reference: reference, parentExecutable: String(cString: path)) else { return 1 }
         do {
-            let password = try KeychainCredentialStore().read(reference: reference)
+            let allowInteraction = environment["LULUTERMINAL_KEYCHAIN_UI"] == "allow"
+            // This process handles one askpass request; it never initializes the UI app.
+            guard SecKeychainSetUserInteractionAllowed(allowInteraction) == errSecSuccess else { return 1 }
+            let password = try KeychainCredentialStore().read(reference: reference, allowInteraction: allowInteraction)
             guard !password.isEmpty, !password.contains(where: { $0 == "\n" || $0 == "\r" || $0 == "\0" }) else { return 1 }
             try FileHandle.standardOutput.write(contentsOf: Data((password + "\n").utf8))
             return 0
+        } catch SSHPasswordError.keychainAccessRequired {
+            try? FileHandle.standardError.write(contentsOf: Data((keychainAccessRequiredMarker + "\n").utf8))
+            return 1
         } catch { return 1 }
     }
 

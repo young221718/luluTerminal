@@ -35,7 +35,7 @@ public final class AppModel: ObservableObject {
     private let helperPath: String?
     private let agentEnvironment: [String: String]
     private struct AccountKey: Hashable { let serverID: UUID; let accountID: UUID }
-    private var pausedAuthentication: Set<AccountKey> = []
+    private var pausedAuthentication: [AccountKey: SSHConnectionFailure] = [:]
     private var activeAuthentication: Set<AccountKey> = []
     private var passwordTerminalAccounts: [UUID: AccountKey] = [:]
     private var savingProfiles: Set<UUID> = []
@@ -46,6 +46,10 @@ public final class AppModel: ObservableObject {
     private var polls: [UUID: Task<Void, Never>] = [:]
     private var connectionTokens: [UUID: UUID] = [:]
     private var connectionChecks: [UUID: Task<ProcessResult, Error>] = [:]
+    private var connectionRecoveryEnabled = false
+    private var interruptedConnections: [UUID: ServerProfile] = [:]
+    private var recoveryPermits: Set<UUID> = []
+    private var automaticConnectionTokens: [UUID: UUID] = [:]
     private var scheduler: Task<Void, Never>?
     private var lastDemoRefresh = Date.distantPast
     private var monitoringEnabled = true
@@ -126,6 +130,13 @@ public final class AppModel: ObservableObject {
     func closeTab(_ id: UUID) { workspace.close(tabID: id); disconnected(id); persist() }
     func reopenTab(_ id: UUID) { workspace.reopen(tabID: id); persist() }
     func disconnected(_ id: UUID) {
+        interruptedConnections[id] = nil
+        recoveryPermits.remove(id)
+        automaticConnectionTokens[id] = nil
+        invalidateConnection(id)
+    }
+
+    private func invalidateConnection(_ id: UUID) {
         passwordTerminalAccounts[id] = nil
         connectionTokens[id] = nil
         connectionChecks.removeValue(forKey: id)?.cancel()
@@ -135,10 +146,52 @@ public final class AppModel: ObservableObject {
     func terminalExited(_ id: UUID) {
         if let key = passwordTerminalAccounts.removeValue(forKey: id),
            workspace.servers.first(where: { $0.id == key.serverID })?.accounts.first(where: { $0.id == key.accountID })?.authMethod == .password {
-            pausedAuthentication.insert(key)
+            pausedAuthentication[key] = .authentication
             collectionErrors[key.serverID] = "SSH 연결 확인 필요. 다시 연결하거나 서버 메뉴에서 인증 설정을 확인하세요."
         }
-        disconnected(id)
+        // Only an observed sleep/network interruption carries reconnect intent through an exit.
+        if interruptedConnections[id] != nil { invalidateConnection(id) }
+        else { disconnected(id) }
+    }
+
+    func configureConnectionRecovery(enabled: Bool) {
+        connectionRecoveryEnabled = enabled
+        if !enabled {
+            interruptedConnections.removeAll()
+            recoveryPermits.removeAll()
+            for id in Array(automaticConnectionTokens.keys) { disconnected(id) }
+        }
+    }
+
+    func connectionEnvironmentInterrupted() {
+        guard connectionRecoveryEnabled, !isDemo else { return }
+        for tab in workspace.tabs where !tab.isClosed {
+            guard let server = recoveryServer(for: tab) else { continue }
+            if connections[tab.id] == .launched { interruptedConnections[tab.id] = server }
+            if connections[tab.id] == .checking { invalidateConnection(tab.id) }
+        }
+        recoveryPermits.removeAll()
+    }
+
+    func beginConnectionRecovery() -> [UUID] {
+        recoveryPermits.removeAll()
+        guard connectionRecoveryEnabled, !isDemo, !persistenceBlocked else { return [] }
+        var ids: [UUID] = []
+        for tab in workspace.tabs where !tab.isClosed && connections[tab.id] != .checking {
+            guard let server = recoveryServer(for: tab),
+                  connections[tab.id] == .launched || interruptedConnections[tab.id] == server,
+                  pausedAuthentication[AccountKey(serverID: server.id, accountID: tab.accountID)] == nil else { continue }
+            interruptedConnections[tab.id] = server
+            ids.append(tab.id)
+        }
+        recoveryPermits = Set(ids)
+        return ids
+    }
+
+    private func recoveryServer(for tab: TerminalTab) -> ServerProfile? {
+        guard let server = workspace.servers.first(where: { $0.id == tab.serverID && $0.kind == .ssh }),
+              let account = server.accounts.first(where: { $0.id == tab.accountID }), account.authMethod != .password else { return nil }
+        return server
     }
 
     func saveProfile(_ profile: ServerProfile) throws {
@@ -291,7 +344,7 @@ public final class AppModel: ObservableObject {
         // Keep the prior credential dormant and existing terminal surfaces connected.
         try commitProfile(profile, disconnectTabs: false)
         cancelSSHKeySetup(setup.id)
-        pausedAuthentication.remove(AccountKey(serverID: profile.id, accountID: setup.account.id))
+        pausedAuthentication[AccountKey(serverID: profile.id, accountID: setup.account.id)] = nil
         collectionErrors[profile.id] = nil
         lastAttempts[profile.id] = nil
     }
@@ -356,7 +409,7 @@ public final class AppModel: ObservableObject {
         }
         lastAttempts[profile.id] = nil
         if old?.accounts != profile.accounts || old?.host != profile.host || old?.port != profile.port {
-            pausedAuthentication = pausedAuthentication.filter { $0.serverID != profile.id }
+            pausedAuthentication = pausedAuthentication.filter { $0.key.serverID != profile.id }
         }
         polls[profile.id]?.cancel()
     }
@@ -389,10 +442,18 @@ public final class AppModel: ObservableObject {
     }
 
     func prepareConnection(tabID: UUID, create: Bool, probeExisting: Bool = true,
-                           retryAuthentication: Bool = false, manualAuthentication: Bool = false) async -> ShellCommand? {
+                           retryAuthentication: Bool = false, manualAuthentication: Bool = false, automaticRecovery: Bool = false) async -> ShellCommand? {
+        if automaticRecovery {
+            guard recoveryPermits.remove(tabID) != nil, connectionRecoveryEnabled, !create, probeExisting,
+                  !retryAuthentication, !manualAuthentication else { return nil }
+        } else { recoveryPermits.remove(tabID) }
         guard let tab = workspace.tabs.first(where: { $0.id == tabID && !$0.isClosed }),
               let server = workspace.servers.first(where: { $0.id == tab.serverID }), let account = account(for: tab) else { return nil }
         guard server.kind == .local || !isDemo else { return nil }
+        if automaticRecovery {
+            guard !persistenceBlocked, recoveryServer(for: tab) == server, interruptedConnections[tabID] == server,
+                  pausedAuthentication[AccountKey(serverID: server.id, accountID: account.id)] == nil else { return nil }
+        } else { interruptedConnections[tabID] = nil }
         guard connections[tabID] != .checking else { return nil }
         let key = AccountKey(serverID: server.id, accountID: account.id)
         let savedPassword = server.kind == .ssh && account.authMethod == .password && !manualAuthentication
@@ -400,11 +461,17 @@ public final class AppModel: ObservableObject {
         let protectedAuthentication = savedPassword || managedKey
         let token = UUID()
         var ownsAuthentication = false
+        let previousConnectionState = connections[tabID]
         connectionTokens[tabID] = token
+        if automaticRecovery { automaticConnectionTokens[tabID] = token }
         connections[tabID] = .checking
         defer {
             if ownsAuthentication { activeAuthentication.remove(key) }
-            if connectionTokens[tabID] == token { connectionChecks[tabID] = nil }
+            if automaticConnectionTokens[tabID] == token { automaticConnectionTokens[tabID] = nil }
+            if connectionTokens[tabID] == token {
+                connectionChecks[tabID] = nil
+                if connections[tabID] == .checking { connections[tabID] = .disconnected }
+            }
         }
         do {
             if server.kind == .local {
@@ -412,17 +479,29 @@ public final class AppModel: ObservableObject {
                 connections[tabID] = .launched
                 return command
             }
+            if automaticRecovery && account.authMethod == .system {
+                do {
+                    // Detect unsupported routes without replacing them with a direct connection.
+                    _ = try await SSHPasswordAuthentication.resolveTarget(server: server, account: account, execute: execute)
+                } catch {
+                    guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
+                    interruptedConnections[tabID] = nil
+                    connections[tabID] = previousConnectionState == .launched ? .launched : .failed("이 SSH 설정은 자동 복구를 지원하지 않습니다. 기존 설정으로 수동 연결하세요.")
+                    return nil
+                }
+                guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
+            }
             if account.authMethod == .password || managedKey {
                 if let poll = polls[server.id] { await poll.value }
-                guard connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
-                if retryAuthentication { pausedAuthentication.remove(key); collectionErrors[server.id] = nil }
+                guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
+                if retryAuthentication { pausedAuthentication[key] = nil; collectionErrors[server.id] = nil }
                 if protectedAuthentication {
                     guard !activeAuthentication.contains(key) else {
                         connections[tabID] = .failed("이 계정의 SSH 연결을 확인하고 있습니다. 잠시 후 다시 시도하세요.")
                         return nil
                     }
-                    guard !pausedAuthentication.contains(key) else {
-                        connections[tabID] = .authenticationRequired(managedKey ? "SSH 키 잠금 해제가 필요합니다. 서버 메뉴에서 SSH 키 잠금 해제를 선택하세요." : "SSH 연결 확인 필요. 저장한 비밀번호로 다시 시도하거나 터미널에서 직접 인증하세요.")
+                    if let failure = pausedAuthentication[key] {
+                        connections[tabID] = connectionState(for: failure)
                         return nil
                     }
                     activeAuthentication.insert(key)
@@ -432,7 +511,7 @@ public final class AppModel: ObservableObject {
             let authentication: SSHAuthenticationContext?
             if savedPassword {
                 guard let helperPath else { throw UIError.message("비밀번호 연결 도우미가 없습니다. 앱을 다시 설치하세요.") }
-                authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, allowsKeychainInteraction: true, execute: execute)
+                authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, allowsKeychainInteraction: !automaticRecovery, execute: execute)
             } else { authentication = nil }
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
                   workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
@@ -440,23 +519,21 @@ public final class AppModel: ObservableObject {
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
             // Explicit creation authenticates first; exit 44 means the requested session is absent.
             if (!create && probeExisting) || protectedAuthentication {
-                let probe = try SSHCommandBuilder.probe(server: server, account: account, tab: tab, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedSocket)
+                var probe = try SSHCommandBuilder.probe(server: server, account: account, tab: tab, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedSocket)
+                if automaticRecovery { probe = unattendedRecoveryCommand(probe) }
                 let execute = self.execute
                 let check = Task { try await execute(probe, 8) }
                 connectionChecks[tabID] = check
                 let result = try await check.value
-                guard connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
+                guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
                 guard result.exitCode == 0 || (create && result.exitCode == 44) else {
                     switch result.exitCode {
                     case 44: connections[tabID] = .missing
                     case 127: connections[tabID] = .failed("원격 tmux가 설치되어 있지 않습니다.")
                     case 255:
-                        if protectedAuthentication { pausedAuthentication.insert(key) }
-                        connections[tabID] = .authenticationRequired(managedKey
-                            ? "SSH 키 인증을 확인할 수 없습니다. 서버 메뉴에서 SSH 키 잠금 해제를 선택하세요.\n\(String(result.stderr.prefix(600)))"
-                            : result.stderr.contains(SSHPasswordAuthentication.keychainAccessRequiredMarker)
-                            ? SSHPasswordError.keychainAccessRequired.localizedDescription
-                            : "SSH 연결 확인 필요. 터미널에서 인증하고 연결할 수 있습니다.\n\(String(result.stderr.prefix(600)))")
+                        let failure = SSHConnectionFailure.classify(exitCode: result.exitCode, stderr: result.stderr)
+                        if failure.blocksAutomaticRetry { pausedAuthentication[key] = failure }
+                        connections[tabID] = connectionState(for: failure)
                     default: connections[tabID] = .failed("SSH 세션 확인 실패 (\(result.exitCode)). \(String(result.stderr.prefix(600)))")
                     }
                     return nil
@@ -466,8 +543,11 @@ public final class AppModel: ObservableObject {
                   workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
             // Probe and terminal use separate SSH processes. Allow Once for the probe
             // must not leave the explicit terminal request unable to ask for access.
-            let command = try SSHCommandBuilder.terminal(server: server, account: account, tab: tab, create: create,
+            var command = try SSHCommandBuilder.terminal(server: server, account: account, tab: tab, create: create,
                                                         authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedSocket)
+            if automaticRecovery { command = unattendedRecoveryCommand(command) }
+            interruptedConnections[tabID] = nil
+            pausedAuthentication[key] = nil
             if savedPassword {
                 passwordTerminalAccounts[tab.id] = key
                 lastAttempts[server.id] = Date().addingTimeInterval(10)
@@ -475,14 +555,41 @@ public final class AppModel: ObservableObject {
             connections[tabID] = .launched
             return command
         } catch {
-            if connectionTokens[tabID] == token {
-                if protectedAuthentication {
-                    pausedAuthentication.insert(key)
-                    connections[tabID] = .authenticationRequired("SSH 연결 확인 필요. \(error.localizedDescription)")
-                } else { connections[tabID] = .failed(error.localizedDescription) }
+            if !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) {
+                let failure = connectionFailure(for: error)
+                if failure.blocksAutomaticRetry && (protectedAuthentication || automaticRecovery) { pausedAuthentication[key] = failure }
+                connections[tabID] = connectionState(for: failure)
             }
             return nil
         }
+    }
+
+    private func connectionState(for failure: SSHConnectionFailure) -> ConnectionState {
+        switch failure {
+        case .authentication, .keychainAccess: return .authenticationRequired(failure.localizedDescription)
+        default: return .failed(failure.localizedDescription)
+        }
+    }
+
+    private func connectionFailure(for error: Error) -> SSHConnectionFailure {
+        if let failure = error as? SSHConnectionFailure { return failure }
+        if let passwordError = error as? SSHPasswordError {
+            if case .keychainAccessRequired = passwordError { return .keychainAccess }
+            return .authentication
+        }
+        if let processError = error as? ProcessRunnerError, processError == .timedOut { return .network }
+        return .unknown
+    }
+
+    private func unattendedRecoveryCommand(_ command: ShellCommand) -> ShellCommand {
+        var command = command
+        // OpenSSH uses the first value; these precede interactive defaults and existing SSH configuration.
+        command.arguments = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
+                             "-o", "PasswordAuthentication=no", "-o", "KbdInteractiveAuthentication=no",
+                             "-o", "UseKeychain=no", "-o", "AddKeysToAgent=no", "-o", "PermitLocalCommand=no",
+                             "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no"] + command.arguments
+        command.environment.merge(["SSH_ASKPASS_REQUIRE": "never", "SSH_ASKPASS": "", "LULUTERMINAL_SSH_REFERENCE": "", "LULUTERMINAL_KEYCHAIN_UI": "fail", "LC_ALL": "C"]) { _, value in value }
+        return command
     }
 
     func start() {
@@ -499,6 +606,8 @@ public final class AppModel: ObservableObject {
         scheduler?.cancel(); scheduler = nil
         for task in polls.values { task.cancel() }
         for id in Array(connectionTokens.keys) { disconnected(id) }
+        interruptedConnections.removeAll()
+        recoveryPermits.removeAll()
         for id in Array(keySetupTokens.values) { cancelSSHKeySetup(id) }
     }
     func configureMonitoring(enabled: Bool, selectedInterval: TimeInterval) {
@@ -538,9 +647,9 @@ public final class AppModel: ObservableObject {
             .prefix(slots).map(\.id)
     }
     private func isAuthenticationUnavailable(server: ServerProfile) -> Bool {
-        guard let account = server.accounts.first(where: { $0.id == server.monitorAccountID }), account.authMethod != .system else { return false }
+        guard let account = server.accounts.first(where: { $0.id == server.monitorAccountID }) else { return false }
         let key = AccountKey(serverID: server.id, accountID: account.id)
-        return pausedAuthentication.contains(key) || activeAuthentication.contains(key) || savingProfiles.contains(server.id)
+        return pausedAuthentication[key] != nil || activeAuthentication.contains(key) || savingProfiles.contains(server.id)
     }
 
     private func poll(_ id: UUID, at time: Date) {
@@ -571,13 +680,12 @@ public final class AppModel: ObservableObject {
                 receivedResult = true
                 guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
                 guard result.exitCode == 0 else {
-                    if protectedAuthentication && result.exitCode == 255 { self.pausedAuthentication.insert(key) }
-                    if savedPassword && result.stderr.contains(SSHPasswordAuthentication.keychainAccessRequiredMarker) {
-                        throw SSHPasswordError.keychainAccessRequired
+                    if result.exitCode == 255 {
+                        let failure = SSHConnectionFailure.classify(exitCode: result.exitCode, stderr: result.stderr)
+                        if failure.blocksAutomaticRetry && (protectedAuthentication || failure != .unknown) { self.pausedAuthentication[key] = failure }
+                        throw failure
                     }
-                    throw UIError.message(protectedAuthentication && result.exitCode == 255
-                        ? "SSH 연결 확인 필요. 자동 인증을 멈췄습니다. 서버 메뉴에서 SSH 키 잠금 해제 또는 인증 설정을 확인하세요."
-                        : "수집 실패 (\(result.exitCode)): \(String(result.stderr.prefix(400)))")
+                    throw UIError.message("수집 실패 (\(result.exitCode)): \(String(result.stderr.prefix(400)))")
                 }
                 let raw = try MetricsParser.parse(result.stdout, timestamp: Date())
                 let snapshot = MetricsCalculator.calculate(current: raw, previous: self.previous[id])
@@ -586,7 +694,10 @@ public final class AppModel: ObservableObject {
                 self.collectionErrors[id] = nil
             } catch {
                 if !Task.isCancelled, self.workspace.servers.contains(server) {
-                    if protectedAuthentication && !receivedResult { self.pausedAuthentication.insert(key) }
+                    if protectedAuthentication && !receivedResult {
+                        let failure = self.connectionFailure(for: error)
+                        if failure.blocksAutomaticRetry { self.pausedAuthentication[key] = failure }
+                    }
                     self.collectionErrors[id] = error.localizedDescription
                 }
             }

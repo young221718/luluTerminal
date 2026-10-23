@@ -26,7 +26,8 @@ INFRA_CORE_ONLY=1 bash scripts/test.sh --scratch-path .build-core
 | InfraCoreTests / SSHPasswordTests | 6 | SSH-02·03·04; 대상 바인딩·askpass·환경 |
 | InfraCoreTests / SSHManagedKeysTests | 6 | KEY-01·02·03·04; 지정 키·agent·등록 보존·임시 실제 키 fixture |
 | InfraCoreTests / KeychainAccessTests | 2 | SSH-04; 주입 API로 조회 UI 정책·권한 오류 |
-| InfraTerminalUITests / AppModelTests | 36 | 아래 책임별 파일 참조 |
+| InfraCoreTests / SSHConnectionFailureTests | 3 | SSH-06; 네트워크·인증·호스트키·Keychain·미분류 오류 구분 |
+| InfraTerminalUITests / AppModelTests | 47 | 아래 책임별 파일 참조 |
 | InfraTerminalUITests / AppearancePreferencesTests | 2 | UI-04; 기본 외관·저장 |
 | InfraTerminalUITests / CustomAppearancePreferencesTests | 4 | UI-04·05; 색·폰트 검증·복원 |
 | InfraTerminalUITests / MonitoringPreferencesTests | 7 | MON-01, UI-01·03; 설정 저장·터미널 보존 |
@@ -37,14 +38,17 @@ INFRA_CORE_ONLY=1 bash scripts/test.sh --scratch-path .build-core
 | InfraTerminalUITests / PanelLayoutTests | 3 | UI-03; 좁은 창·드래그·접기·복원 |
 | InfraTerminalUITests / ResourceInterpolationTests | 3 | UI-06; 보간 시간·중간 숫자·미측정 |
 | InfraTerminalUITests / ServerOrderTests | 3 | WS-02; 순서·무효 이동·실패 보존 |
+| InfraTerminalUITests / ConnectionLifecycleTests | 4 | REC-01·02; opt-in 저장·초기 경로 무시·절전/경로 이벤트 병합·중단 |
+| InfraTerminalUITests / QuickSwitcherTests | 10 | UI-08; 토큰 검색·한글·계정·열린 탭·identity·선택 시 연결 보존·native 방향키/IME 정책/포커스 |
+| TerminalBridgeTests / TerminalSearchTests | 12 | TERM-06; 기존 surface 검색·결과·세대·닫기·모달·단축키·반복 포커스 요청 |
 | TerminalBridgeTests / TerminalHostTests | 11 | TERM-01·05, UI-03·04·05·07; surface 재사용·해제·재연결 경합·입력 |
-| 합계 | 128 | 19 suites, Core 46 / UI 71 / Bridge 11 |
+| 합계 | 168 | 23 suites, Core 49 / UI 96 / Bridge 23 |
 
 위 연결은 해당 요구의 모든 UI·하드웨어·실서버 조건이 자동 검사로 증명됐다는 의미가 아니다. 수락 범위는 아래와 VERIFICATION에서 구분한다.
 
 ## AppModelTests 파일 구분
 
-동일한 `@Suite @MainActor AppModelTests`를 파일별 extension으로 나눈다. 기존 필터·36개 메서드 이름과 assertion을 유지한다.
+동일한 `@Suite @MainActor AppModelTests`를 파일별 extension으로 나눈다. 기존 필터·36개 메서드 이름과 assertion을 유지하며 연결 복구 11개를 추가했다. 인증 분류 검사에서는 기존 일반 오류 fixture를 실제 인증 실패 진단으로 바꿨다.
 
 | 파일 | 검사 수 | 책임 |
 | --- | ---: | --- |
@@ -52,6 +56,7 @@ INFRA_CORE_ONLY=1 bash scripts/test.sh --scratch-path .build-core
 | AppModelPasswordTests.swift | 13 | 비밀번호 참조·저장 실패·Keychain 정책·인증 경합 |
 | AppModelManagedKeyTests.swift | 8 | 관리 키 활성화·취소·stale 대상·agent·모니터링 |
 | AppModelMonitoringTests.swift | 7 | 수집 슬롯·중복 방지·기아 방지·이력 무효화·unknown |
+| AppModelConnectionRecoveryTests.swift | 11 | 실패 분류·정책·무인 기존 세션 연결·경유 설정 제외·수동 재시도·취소/편집/닫기/비활성화·대기 탭 보호 |
 | AppModelTestSupport.swift | 0 | 공유 server/tempURL/waitUntil, SuspendedCollector, TestPasswordStore |
 
 fixture는 실제로 공유되는 범위에서만 internal로 열고 도메인 recorder는 소유 파일에 둔다. 프로덕션 추상화나 새 테스트 프레임워크를 추가하지 않는다.
@@ -68,4 +73,4 @@ fixture는 실제로 공유되는 범위에서만 internal로 열고 도메인 r
 
 관리 키 검증 응답이 지연되는 동안 취소, 검증 성공 직후 상태 저장 실패, 입력 SSH 별칭은 같지만 해석 대상이 바뀌는 경우, 상속 socket이 없어 launchctl에서 agent를 찾는 경우를 후속 보강 후보로 남긴다. 현재 검사로 모두 검증됐다고 주장하지 않는다.
 
-Ansible 개발은 2026-10-23 사용자 결정으로 취소됐다. [이전 설계의 수락 행렬](ANSIBLE_DESIGN.md#수락-검사-계획)은 이력이며 활성 검사 TODO가 아니다. Ansible 검사는 구현·실행하지 않았고 이번 128개 결과에도 포함하지 않는다.
+Ansible 개발은 2026-10-23 사용자 결정으로 취소됐다. [이전 설계의 수락 행렬](ANSIBLE_DESIGN.md#수락-검사-계획)은 이력이며 활성 검사 TODO가 아니다. Ansible 검사는 구현·실행하지 않았고 현재 168개 결과에도 포함하지 않는다.

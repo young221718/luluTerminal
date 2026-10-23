@@ -2,6 +2,18 @@
 
 현재 요구는 [SPEC](SPEC.md), 검사 책임·명령은 [TESTING](TESTING.md)을 따른다. 정리 전 전체 검증 기록은 [원문 이력](history/VERIFICATION-before-organization-2026-10-23.md)에 보존했다. 과거 관찰과 이번 실행을 구분한다.
 
+## 2026-10-23 연결 복구·검색·빠른 이동
+
+- 최종 `bash scripts/test.sh`: **168개 테스트 / 23개 suite 통과**, 3.297초. Core 49 / UI 96 / Bridge 23. 기존 128개를 보존하고 실패 분류·복구 경합·검색·빠른 이동·native 입력을 추가했다.
+- 최초 검색 단축키·delegate 누락과, 반복 검색 포커스·Ghostty wrapper의 false 반환 처리 문제를 RED로 재현한 뒤 통과했다. 시스템 이벤트 검사는 고정 짧은 sleep 대신 콜백 도착을 제한 시간 안에 기다리도록 수정했다.
+- 독립 읽기 전용 검토에서 대기 중 수동 연결을 자동 복구가 닫는 경합, managedKey 명시 재시도가 차단되는 문제, 반복 검색의 포커스 문제를 찾아 수정·재검토했다. 최종 범위에서 추가 actionable finding은 없었다.
+- `bash scripts/build-app.sh` release 빌드, 21개 라이선스 고지 검사, `codesign --verify --deep --strict` 통과. 기존 Keychain API 및 native SwiftPM 폐기 경고는 남아 있다.
+- 기존 `/Applications/luluTerminal.app`에만 적용했다. 이전 앱을 별도 ZIP으로 보존했고 설치본 56개 파일이 빌드본과 일치했다. 두 번의 설치 모두 실행 전 workspace JSON SHA-256이 설치 직후와 동일했다. 최종 실행파일 SHA-256: `f2d6f258f5e1b5b346a1019ddda06fecadc699edd72074f6f76d534a6dc89fc0`.
+- 실제 설치 앱에서 첫 ⌘F의 입력 초점, 실제 출력 일치 강조와 `1 / 1` 결과, Return 이동, 터미널 클릭 후 반복 ⌘F의 검색어 보존·초점 복귀, Escape 닫기를 확인했다. 초기 SwiftUI 입력의 최초 포커스 누락은 native 필드로 교체한 최종 앱에서 재검사했다.
+- 실제 빠른 이동 창에서 ⇧⌘P, 영문 서버 및 붙여 넣은 한글 검색어, 위·아래 방향키 선택, Return으로 기존 서버·열린 탭 이동을 확인했다. SwiftUI TextField가 방향키를 소비하던 현상을 발견해 native delegate로 수정한 뒤 재검사했다. 원격 탭 선택은 연결을 시작하지 않았으며 로컬 탭으로 돌아왔을 때 기존 출력이 유지됐다.
+- 일반 설정에 연결 복구 스위치가 있고 기본 꺼짐인 것을 확인했다. 자동 복구는 키 기반 기존 세션만 대상으로 하며 저장 비밀번호·경유 SSH·HostKeyAlias 등 지원하지 않는 설정은 수동 연결을 유지한다. 실제 OS 절전·네트워크 전환·다중 서버 장시간 복구는 이번 검증에서 수행하지 않았다.
+- 한글 검색어 일치와 marked-text 정책 검사는 실제 한국어 IME 후보 선택·조합 확정/취소 전체 수락을 대신하지 않는다. VoiceOver·Intel 기기·장시간 메모리 추이·Developer ID 공증은 이번 결과에 포함하지 않는다.
+
 ## 2026-10-23 테스트·문서 정리
 
 - macOS 27.0.1 arm64 / Apple Swift 6.4에서 `bash scripts/test.sh`를 실행했다. 빌드 완료 후 **128개 테스트 / 19개 suite 전체 통과**, 테스트 실행 3.308초를 관찰했다. Core 46 / UI 71 / Bridge 11이다. 새 worktree에 복사된 module cache는 원래 경로를 보존한 뒤 새로 생성했다.

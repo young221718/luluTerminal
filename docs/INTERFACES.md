@@ -11,10 +11,11 @@
 | 단기 실행 | [ProcessRunner.swift](../Sources/InfraCore/ProcessRunner.swift) | run 결과는 exitCode/stdout/stderr. 기본 timeout 8초, 합계 출력 1 MiB. 취소·timeout·출력 초과 때 프로세스 그룹 종료·직접 자식 회수. 장시간 작업 API로 사용하지 않는다. |
 | 저장 비밀번호 | [SSHPasswordAuthentication.swift](../Sources/InfraCore/SSHPasswordAuthentication.swift), [KeychainCredentialStore.swift](../Sources/InfraCore/KeychainCredentialStore.swift) | resolveTarget/context가 해석된 대상과 참조를 검증. PasswordCredentialStore는 테스트 주입 경계. 비밀 원문은 JSON·argv·환경에 넣지 않는다. |
 | 앱 생성 키 | [SSHManagedKeys.swift](../Sources/InfraCore/SSHManagedKeys.swift) | 참조·키 경로·setup/unlock/verification 명령. 입력/해석된 대상 바인딩과 검증된 agent socket 사용. 암호는 native 터미널에서만 입력. |
+| 연결 실패 | [SSHConnectionFailure.swift](../Sources/InfraCore/SSHConnectionFailure.swift) | SSH 255를 network/authentication/keychainAccess/hostKey/unknown으로 분류. network 외 실패는 자동 재시도를 막으며 네트워크 오류를 키 잠금 해제로 오인하지 않는다. |
 | 측정값 | [Metrics.swift](../Sources/InfraCore/Metrics.swift) | 비율은 0…1 Double?, nil은 unknown. 개별 DiskReading/GPUReading/NetworkRate와 기존 요약을 구분. Parser와 Calculator는 수집·화면에서 분리. |
 | 현재 Mac | [LocalMachine.swift](../Sources/InfraCore/LocalMachine.swift) | 예약 UUID, 기존 순서를 보존하는 ensureLocalMachine, 로컬 셸·CPU/RAM/마운트 수집. SSH builder는 local 거부. |
 
-SSHCommandBuilder의 terminal/probe/monitor는 optional authentication, manualAuthentication, managedKeyAgentSocket 및 테스트용 managedKeyRootURL을 받는다. managedKey의 격리 정책을 임의 Ansible inventory에 그대로 적용하면 경유·별칭 설정이 사라지므로 후속 연동이 이 builder를 일반 Ansible 인증기로 재사용해서는 안 된다.
+SSHCommandBuilder의 terminal/probe/monitor는 optional authentication, manualAuthentication, managedKeyAgentSocket 및 테스트용 managedKeyRootURL을 받는다. 자동 복구는 해석된 SSH 설정을 먼저 확인하고 ProxyJump·ProxyCommand·HostKeyAlias 연결을 수동 재시도로 남긴다. 비대화형 복구를 위해 기존 SSH 경로·포워딩을 제거하지 않는다.
 
 Keychain context의 allowsKeychainInteraction 기본값은 false다. 비밀 없는 정책 LULUTERMINAL_KEYCHAIN_UI=allow|fail을 독립 도우미에 전달한다. 명시 연결의 probe와 terminal만 true, 모니터링은 false다. keychainAccessRequired와 비밀 없는 stderr marker로 일반 인증 실패를 구분한다. 도우미는 자신의 프로세스에서만 UI 정책을 적용하고 종료한다.
 
@@ -24,16 +25,30 @@ Keychain context의 allowsKeychainInteraction 기본값은 false다. 비밀 없�
 
 managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 모두 성공해야 한다. 설정 터미널 종료 자체는 성공 신호가 아니다. 기존 password 참조는 휴면 상태로 보존하고 managedKey 경로에서 읽지 않는다.
 
-[InfraRootView.swift](../Sources/InfraTerminalUI/InfraRootView.swift)는 선택한 로컬 셸을 열 수 있지만 원격 새 세션은 명시적 동작에서만 만든다. 외관·모니터링 설정은 workspace JSON과 별도다. [ResourceInterpolation.swift](../Sources/InfraTerminalUI/ResourceInterpolation.swift)는 표시만 보간하며 새 수집 타이머를 만들지 않는다.
+연결 복구의 모델 경계는 configureConnectionRecovery(enabled:), connectionEnvironmentInterrupted(), beginConnectionRecovery()와 prepareConnection(... automaticRecovery:)다. 중단 전 연결 의도·탭·계정·프로필·token을 재확인하며 복구 허가는 한 번만 사용한다. 저장 비밀번호·닫힌 탭·로컬·데모를 제외하고 기존 세션만 확인한다. 수동 해제·닫기·프로필 변경·설정 해제 뒤 오래된 결과를 버린다. 자동 복구는 Keychain UI·askpass·대화형 인증을 허용하지 않는다.
+
+| 책임 | 구현 | 경계 |
+| --- | --- | --- |
+| 복구 설정 | [ConnectionPreferences.swift](../Sources/InfraTerminalUI/ConnectionPreferences.swift) | automaticallyReconnect 기본 false. connection.automaticallyReconnect를 UserDefaults에 저장하며 workspace JSON과 분리. |
+| 시스템 복귀 이벤트 | [ConnectionLifecycle.swift](../Sources/InfraTerminalUI/ConnectionLifecycle.swift) | NSWorkspace 절전/복귀와 NWPathMonitor 경로 이벤트를 합친다. 초기 정상 알림은 복구하지 않고 지연된 이벤트는 generation으로 무효화. 대상 판단은 AppModel 소유. |
+| 현재 터미널 검색 | [TerminalSearchBar.swift](../Sources/InfraTerminalUI/TerminalSearchBar.swift) | Ghostty 검색 상태 표시·검색어·이전/다음·닫기와 입력 포커스. 검색 실행과 surface 수명은 TerminalHost 소유. |
+| 빠른 이동 | [QuickSwitcher.swift](../Sources/InfraTerminalUI/QuickSwitcher.swift) | QuickSwitchTarget.server(UUID)/tab(UUID), QuickSwitchItem.entries(workspace:query:). 서버 순서와 열린 탭을 유지한 토큰 AND 검색. 열린 탭이 없는 계정은 서버 행으로 찾으며 모델 변경은 onSelect 콜백에 위임. |
+| 메뉴·단축키 | [TerminalWorkspaceCommands.swift](../Sources/InfraTerminalUI/TerminalWorkspaceCommands.swift) | 활성 창의 focused actions로 ⌘F·⇧⌘P를 연결. 검색은 현재 실행 중인 탭, 빠른 이동은 서버·계정·열린 탭 대상. |
+
+[InfraRootView.swift](../Sources/InfraTerminalUI/InfraRootView.swift)는 선택한 로컬 셸을 열 수 있지만 원격 새 세션은 명시적 동작에서만 만든다. 빠른 이동은 기존 selectServer/selectTab만 호출하며 UUID·연결·열린 surface를 유지한다. 복구 설정·이벤트를 연결하고 modal 표시 중에는 복구를 미룬다. 외관·모니터링·연결 복구 설정은 workspace JSON과 별도다. 비활성 Ansible 메뉴·안내는 제거했다. [ResourceInterpolation.swift](../Sources/InfraTerminalUI/ResourceInterpolation.swift)는 표시만 보간하며 새 수집 타이머를 만들지 않는다.
+
+[SearchInputField.swift](../Sources/InfraTerminalUI/SearchInputField.swift)는 검색과 빠른 이동의 native NSTextField 입력을 공유한다. field editor delegate에서 방향키·Return·Escape를 처리하고 조합 중인 IME·수정키는 기본 편집기로 넘긴다. 새 포커스 요청은 창 부착·sheet·요청 token을 확인하고 한 번만 적용한다.
 
 ## TerminalBridge
 
-[TerminalHost.swift](../Sources/TerminalBridge/TerminalHost.swift)의 public 경계는 open(id:command:environment:), disconnect(id:), disconnectAll(), error, onExit, onOpenSettings다. TerminalPane(host:id:)가 해당 native view를 표시한다.
+[TerminalHost.swift](../Sources/TerminalBridge/TerminalHost.swift)의 연결 경계는 open(id:command:environment:), disconnect(id:), disconnectAll(), error, onExit, onOpenSettings다. TerminalPane(host:id:)가 해당 native view를 표시한다.
 
 동일 UUID를 열면 surface·PTY·스크롤 기록을 재사용한다. 종료는 native callback 반환 뒤 해제하며 generation이 다르면 새 연결을 건드리지 않는다. 외관·폰트 변경은 기존 controller와 surface에 적용한다.
 
-**onExit는 UUID만 전달하며 프로세스 종료 코드가 아니다.** 후속 Ansible 실행 성공 판단에 사용하지 않는다. 별도 작업 supervisor의 waitpid 결과가 필요하며 기존 SSH 탭 모델과 작업 실행 모델을 분리한다.
+검색 경계는 search, searchFocusRequest, onSearchRequest(UUID), onQuickSwitch(), beginSearch(id:), updateSearchQuery(_:), navigateSearch(previous:), closeSearch(restoreFocus:), focus(id:)다. [TerminalSearchState.swift](../Sources/TerminalBridge/TerminalSearchState.swift)는 탭 UUID·검색어·선택 결과·합계를 보관한다. native search delegate와 Ghostty binding을 사용하고 탭 UUID·surface generation이 지난 결과를 버린다. 검색·빠른 이동으로 새 surface를 만들지 않으며 시트·검색 입력칸의 포커스를 지연된 TerminalPane 콜백이 빼앗지 않는다.
+
+**onExit는 UUID만 전달하며 프로세스 종료 코드가 아니다.** SSH 실패 원인 분류는 AppModel의 사전 확인 결과와 오류 경계를 사용한다.
 
 ## 검사·예정 인터페이스
 
-현재 API는 [TESTING](TESTING.md)의 자동 검사와 [VERIFICATION](VERIFICATION.md)의 수락 범위를 따른다. [Ansible 설계](ANSIBLE_DESIGN.md)의 JobPlan·supervisor·event adapter는 코드에 없는 제안이며 2026-10-23 사용자 결정으로 개발을 취소했다. 이번 정리로 public API를 변경하지 않았다.
+현재 API는 [TESTING](TESTING.md)의 자동 검사와 [VERIFICATION](VERIFICATION.md)의 수락 범위를 따른다. [Ansible 설계](ANSIBLE_DESIGN.md)의 JobPlan·supervisor·event adapter는 코드에 없는 제안이며 2026-10-23 사용자 결정으로 개발을 취소했다.

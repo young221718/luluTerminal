@@ -252,6 +252,7 @@ private struct MonitoringSettings: View {
 }
 
 private struct GeneralSettings: View {
+    @EnvironmentObject private var connectionPreferences: ConnectionPreferences
     @EnvironmentObject private var appearance: AppearancePreferences
     @ViewState private var showsLicenses = false
     let storeURL: URL
@@ -271,11 +272,11 @@ private struct GeneralSettings: View {
                     .font(.caption).foregroundStyle(appearance.colors.muted)
                 Button("오픈소스 라이선스 보기") { showsLicenses = true }
             }
-            Section("Ansible · 준비 중") {
-                TextField("인벤토리", text: .constant("추후 지원"))
-                TextField("플레이북", text: .constant("추후 지원"))
-                Button("실행") {}.disabled(true)
-            }.disabled(true)
+            Section("연결 복구") {
+                Toggle("절전·네트워크 복귀 후 기존 SSH 세션 다시 연결", isOn: $connectionPreferences.automaticallyReconnect)
+                Text("SSH 키로 열었던 탭만 다시 연결합니다. 새 원격 세션은 만들지 않습니다. 저장 비밀번호·잠긴 키·경유 SSH는 직접 연결하세요.")
+                    .font(.caption).foregroundStyle(appearance.colors.muted)
+            }
         }.formStyle(.grouped).scrollContentBackground(.hidden).padding(16)
         .sheet(isPresented: $showsLicenses) { OpenSourceLicensesView() }
     }

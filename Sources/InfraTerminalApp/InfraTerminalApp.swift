@@ -21,6 +21,7 @@ private typealias ViewState<Value> = SwiftUI.State<Value>
 struct InfraTerminalApp: App {
     @StateObject private var appearance = AppearancePreferences(defaults: CommandLine.arguments.contains("--demo") ? UserDefaults(suiteName: "dev.chanyoung.infra-terminal.demo")! : .standard)
     @StateObject private var monitoring = MonitoringPreferences(defaults: CommandLine.arguments.contains("--demo") ? UserDefaults(suiteName: "dev.chanyoung.infra-terminal.demo")! : .standard)
+    @StateObject private var connectionPreferences = ConnectionPreferences(defaults: CommandLine.arguments.contains("--demo") ? UserDefaults(suiteName: "dev.chanyoung.infra-terminal.demo")! : .standard)
     var body: some Scene {
         Window("luluTerminal", id: "main") {
             Group {
@@ -32,6 +33,7 @@ struct InfraTerminalApp: App {
             }.frame(minWidth: 1000, minHeight: 680)
                 .environmentObject(appearance)
                 .environmentObject(monitoring)
+                .environmentObject(connectionPreferences)
                 .background(appearance.colors.background)
                 .preferredColorScheme(appearance.selection.colorScheme)
                 .tint(appearance.colors.accent)
@@ -39,10 +41,12 @@ struct InfraTerminalApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unifiedCompact)
         .defaultSize(width: 1280, height: 800)
+        .commands { TerminalWorkspaceCommands() }
         Settings {
             InfraSettingsView()
                 .environmentObject(appearance)
                 .environmentObject(monitoring)
+                .environmentObject(connectionPreferences)
                 .preferredColorScheme(appearance.selection.colorScheme)
                 .tint(appearance.colors.accent)
         }

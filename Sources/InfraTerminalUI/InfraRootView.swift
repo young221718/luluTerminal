@@ -9,8 +9,13 @@ typealias ViewState<Value> = SwiftUI.State<Value>
 public struct InfraRootView: View {
     @EnvironmentObject private var appearance: AppearancePreferences
     @EnvironmentObject private var monitoring: MonitoringPreferences
+    @EnvironmentObject private var connectionPreferences: ConnectionPreferences
     @StateObject private var model = AppModel()
     @StateObject private var terminal = TerminalHost()
+    @StateObject private var connectionLifecycle = ConnectionLifecycle()
+    @ViewState private var recoveryTask: Task<Void, Never>?
+    @ViewState private var recoveryPending = false
+    @ViewState private var showQuickSwitcher = false
     @ViewState private var editingProfile: ServerProfile?
     @ViewState private var showProfile = false
     @ViewState private var showNewTab = false
@@ -90,8 +95,28 @@ public struct InfraRootView: View {
                 }.fixedSize()
             }
             ToolbarItem(placement: .primaryAction) {
+                Button { openQuickSwitcher() } label: { Label("빠른 이동", systemImage: "rectangle.and.text.magnifyingglass") }
+                    .labelStyle(.iconOnly).help("서버·탭 빠른 이동 · ⇧⌘P")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button { openSettings() } label: { Label("설정", systemImage: "gearshape") }
                     .labelStyle(.titleAndIcon).help("외관 · 글꼴 · 모니터링 설정")
+            }
+        }
+        .focusedSceneValue(\.terminalWorkspaceActions, TerminalWorkspaceActions(
+            find: canSearch ? { openSearch() } : nil,
+            quickSwitch: hasModalPresentation ? nil : { openQuickSwitcher() }))
+        .sheet(isPresented: $showQuickSwitcher, onDismiss: {
+            if let tab = model.selectedTab, model.connections[tab.id] == .launched {
+                terminal.focus(id: tab.id)
+            }
+        }) {
+            QuickSwitcherSheet(workspace: model.workspace) { target in
+                switch target {
+                case .server(let id): model.selectServer(id)
+                case .tab(let id): model.selectTab(id)
+                }
+                showQuickSwitcher = false
             }
         }
         .sheet(isPresented: $showProfile) {
@@ -137,7 +162,27 @@ public struct InfraRootView: View {
         }
         .task {
             terminal.onOpenSettings = { openSettings() }
-            terminal.onExit = { id in model.terminalExited(id) }
+            terminal.onExit = { [weak model = model] id in model?.terminalExited(id) }
+            terminal.onSearchRequest = { [weak terminal = terminal, weak model = model] id in
+                guard let terminal, let model, model.selectedTab?.id == id,
+                      model.connections[id] == .launched,
+                      NSApp.keyWindow?.attachedSheet == nil else { return }
+                terminal.beginSearch(id: id)
+            }
+            let quickSwitch = $showQuickSwitcher
+            terminal.onQuickSwitch = { [weak terminal = terminal] in
+                guard NSApp.keyWindow?.attachedSheet == nil else { return }
+                terminal?.closeSearch(restoreFocus: false)
+                quickSwitch.wrappedValue = true
+            }
+            connectionLifecycle.onInterrupted = {
+                recoveryTask?.cancel()
+                recoveryTask = nil
+                recoveryPending = false
+                model.connectionEnvironmentInterrupted()
+            }
+            connectionLifecycle.onRestored = { requestRecovery() }
+            configureRecovery()
             model.configureMonitoring(enabled: monitoring.enabled, selectedInterval: monitoring.refreshInterval)
             model.start()
         }
@@ -153,7 +198,24 @@ public struct InfraRootView: View {
         .onChange(of: monitoring.refreshInterval) { _, interval in
             model.configureMonitoring(enabled: monitoring.enabled, selectedInterval: interval)
         }
-        .onDisappear { model.stop(); terminal.disconnectAll() }
+        .onChange(of: model.selectedTab?.id) { _, _ in terminal.closeSearch(restoreFocus: false) }
+        .onChange(of: hasModalPresentation) { _, presented in
+            if presented { terminal.closeSearch(restoreFocus: false) }
+            else if recoveryPending { requestRecovery() }
+        }
+        .onChange(of: connectionPreferences.automaticallyReconnect) { _, _ in configureRecovery() }
+        .onDisappear {
+            recoveryTask?.cancel()
+            connectionLifecycle.stop()
+            connectionLifecycle.onInterrupted = nil
+            connectionLifecycle.onRestored = nil
+            terminal.onSearchRequest = nil
+            terminal.onQuickSwitch = nil
+            terminal.onOpenSettings = nil
+            terminal.onExit = nil
+            model.stop()
+            terminal.disconnectAll()
+        }
     }
 
     private var sidebar: some View {
@@ -257,6 +319,8 @@ public struct InfraRootView: View {
             if let tab = model.selectedTab {
                 let state = model.connections[tab.id] ?? .disconnected
                 if state == .launched {
+                    Button { openSearch() } label: { Image(systemName: "magnifyingglass") }
+                        .help("터미널에서 찾기 · ⌘F").accessibilityLabel("터미널에서 찾기")
                     Button("연결 해제") { terminal.disconnect(id: tab.id); model.disconnected(tab.id) }
                     Button { terminal.disconnect(id: tab.id); connect(tab, create: false) } label: { Image(systemName: "arrow.clockwise") }.help(server.kind == .local ? "새 로컬 셸 시작" : "기존 세션에 다시 연결")
                 } else {
@@ -281,7 +345,6 @@ public struct InfraRootView: View {
                         Button("\(model.account(for: tab)?.username ?? "계정 없음") · \(tab.title)") { model.reopenTab(tab.id) }
                     }
                 }
-                Button("Ansible · 준비 중") {}.disabled(true)
             } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).fixedSize().accessibilityLabel("서버 메뉴")
         }.controlSize(.small).padding(.horizontal, 14).padding(.vertical, 8)
     }
@@ -352,6 +415,9 @@ public struct InfraRootView: View {
                 } else if state == .launched {
                     TerminalPane(host: terminal, id: tab.id, style: appearance.terminalStyle).id(tab.id).frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityLabel("\(model.account(for: tab)?.username ?? "") 계정 \(tab.title) 터미널")
+                        .overlay(alignment: .topTrailing) {
+                            if terminal.search?.id == tab.id { TerminalSearchBar(host: terminal) }
+                        }
                 } else {
                     terminalPlaceholder(state.label, detail: server.kind == .local ? "다시 연결하면 현재 로그인 계정의 홈에서 새 셸을 시작합니다.\n로컬 셸은 원격 tmux처럼 작업을 복원하지 않습니다." : "기존 세션 연결은 저장된 tmux ID만 확인합니다.\n원격 서버나 tmux가 종료되면 기존 작업을 복원할 수 없습니다.")
                 }
@@ -394,10 +460,66 @@ public struct InfraRootView: View {
         }
     }
 
+    private var hasModalPresentation: Bool {
+        showProfile || showNewTab || showQuickSwitcher || renamingTab != nil ||
+            keySetupRequest != nil || creatingSessionFor != nil || actionError != nil
+    }
+
+    private var canSearch: Bool {
+        !hasModalPresentation && model.selectedTab.map { model.connections[$0.id] == .launched } == true
+    }
+
+    private func openSearch() {
+        guard canSearch, let tab = model.selectedTab else { return }
+        terminal.beginSearch(id: tab.id)
+    }
+
+    private func openQuickSwitcher() {
+        guard !hasModalPresentation else { return }
+        terminal.closeSearch(restoreFocus: false)
+        showQuickSwitcher = true
+    }
+
+    private func configureRecovery() {
+        let enabled = connectionPreferences.automaticallyReconnect
+        model.configureConnectionRecovery(enabled: enabled)
+        if enabled { connectionLifecycle.start() }
+        else {
+            recoveryTask?.cancel()
+            recoveryTask = nil
+            recoveryPending = false
+            connectionLifecycle.stop()
+        }
+    }
+
+    private func requestRecovery() {
+        guard connectionPreferences.automaticallyReconnect else { return }
+        if hasModalPresentation {
+            recoveryPending = true
+            return
+        }
+        recoveryPending = false
+        let ids = model.beginConnectionRecovery()
+        guard !ids.isEmpty else { return }
+        recoveryTask?.cancel()
+        recoveryTask = Task { @MainActor in
+            for id in ids {
+                guard !Task.isCancelled else { return }
+                if let command = await model.prepareConnection(tabID: id, create: false, automaticRecovery: true),
+                   !Task.isCancelled {
+                    terminal.disconnect(id: id)
+                    terminal.open(id: id, command: command.shellString, environment: command.environment)
+                    if terminal.error != nil { model.disconnected(id) }
+                }
+            }
+            recoveryTask = nil
+        }
+    }
+
     private func connect(_ tab: TerminalTab, create: Bool, interactive: Bool = false, retryAuthentication: Bool = false) {
         terminal.disconnect(id: tab.id)
         Task {
-            if let command = await model.prepareConnection(tabID: tab.id, create: create, probeExisting: !interactive, retryAuthentication: retryAuthentication, manualAuthentication: interactive) {
+            if let command = await model.prepareConnection(tabID: tab.id, create: create, probeExisting: !interactive, retryAuthentication: retryAuthentication || model.account(for: tab)?.authMethod == .managedKey, manualAuthentication: interactive) {
                 terminal.open(id: tab.id, command: command.shellString, environment: command.environment)
                 if terminal.error != nil { model.disconnected(tab.id) }
             }

@@ -1,117 +1,39 @@
-# 작업 간 Swift 인터페이스
+# 모듈 경계와 구현 진입점
 
-모든 Core 타입과 생성자는 public. 값 타입 Codable/Equatable/Sendable을 가능한 범위에서 채택한다.
-비율은 0...1 Double?, nil은 unknown이며 0과 다르다. 핵심 구현자가 추가 필드를 넣어도 아래 이름은 유지한다.
+기준: 2026-10-23 현행 구현. [SPEC](SPEC.md)의 계약을 구현하는 코드 위치를 연결한다. 변경에 뒤처지기 쉬운 Swift 선언 전체 복제 대신 실제 선언을 정본으로 사용한다. 정리 전 선언과 기록은 [원문](history/INTERFACES-before-organization-2026-10-23.md)에 보존했다.
 
-```swift
-struct SSHAccount: Identifiable, Codable, Equatable, Sendable {
-  var id: UUID; var username: String
-  var authMethod: SSHAuthenticationMethod; var credential: SSHPasswordReference?
-  var managedKey: SSHManagedKeyReference?
-  init(id: UUID = UUID(), username: String, authMethod: SSHAuthenticationMethod = .system, credential: SSHPasswordReference? = nil, managedKey: SSHManagedKeyReference? = nil)
-}
-enum ServerConnectionKind: String, Codable, Sendable { case ssh, local }
-struct ServerProfile: Identifiable, Codable, Equatable, Sendable {
-  var id: UUID; var name: String; var host: String; var port: Int; var kind: ServerConnectionKind
-  var accounts: [SSHAccount]; var monitorAccountID: UUID?; var monitoringEnabled: Bool
-  init(id: UUID = UUID(), name: String, host: String, port: Int = 22,
-       accounts: [SSHAccount], monitorAccountID: UUID? = nil, monitoringEnabled: Bool = true, kind: ServerConnectionKind = .ssh)
-  func validate() throws
-}
-struct TerminalTab: Identifiable, Codable, Equatable, Sendable {
-  var id: UUID; var serverID: UUID; var accountID: UUID; var title: String; var isClosed: Bool
-  init(id: UUID = UUID(), serverID: UUID, accountID: UUID, title: String, isClosed: Bool = false)
-  var sessionName: String { get }
-}
-struct WorkspaceState: Codable, Equatable, Sendable {
-  var schemaVersion: Int; var servers: [ServerProfile]; var tabs: [TerminalTab]
-  var selectedServerID: UUID?; var selectedTabByServer: [UUID: UUID]
-  init() // empty state
-  mutating func ensureLocalMachine() // pin once; preserve existing remote choice/tabs
-  mutating func select(serverID: UUID)
-  mutating func select(tabID: UUID)
-  mutating func close(tabID: UUID)
-  mutating func reopen(tabID: UUID)
-  mutating func add(tab: TerminalTab) throws
-}
-struct StateStore {
-  init(url: URL)
-  func load() throws -> WorkspaceState? // absent nil, corrupt throws without rewriting
-  func save(_ state: WorkspaceState) throws
-}
-struct ShellCommand: Sendable {
-  var executable: String; var arguments: [String]; var standardInput: String?; var environment: [String: String]
-  init(executable: String, arguments: [String], standardInput: String? = nil, environment: [String: String] = [:])
-  var shellString: String { get } // correctly quoted for Ghostty command
-}
-enum LocalMachine {
-  static let serverID: UUID; static let accountID: UUID; static let initialTabID: UUID
-  static var username: String { get }; static var loginShell: String { get }; static var homeDirectory: String { get }
-  static var profile: ServerProfile { get }
-  static func terminal(shell: String = loginShell, home: String = homeDirectory) throws -> ShellCommand
-}
-struct LocalCPUReading: Equatable, Sendable {
-  var total: UInt64; var idle: UInt64
-  init(total: UInt64, idle: UInt64)
-}
-struct LocalMetricsCollector: Sendable {
-  init()
-  static func cpuUsage(current: LocalCPUReading, previous: LocalCPUReading?) -> Double?
-  mutating func collect(timestamp: Date = Date()) -> MetricsSnapshot
-}
-enum SSHCommandBuilder {
-  static func terminal(server: ServerProfile, account: SSHAccount, tab: TerminalTab, create: Bool) throws -> ShellCommand
-  static func monitor(server: ServerProfile, account: SSHAccount) throws -> ShellCommand
-}
-struct ProcessResult: Sendable { var exitCode: Int32; var stdout: String; var stderr: String }
-struct ProcessRunner: Sendable {
-  init()
-  func run(_ command: ShellCommand, timeout: TimeInterval = 8) async throws -> ProcessResult
-}
-struct GPUReading: Equatable, Sendable {
-  var name: String; var utilization: Double?; var memoryUsedBytes: Double?; var memoryTotalBytes: Double?
-}
-struct NetworkRate: Equatable, Sendable {
-  var name: String; var receivedBytesPerSecond: Double?; var sentBytesPerSecond: Double?
-}
-struct MetricsSnapshot: Equatable, Sendable {
-  var timestamp: Date
-  var cpu: Double?; var ram: Double?; var disk: Double?; var gpu: Double?; var vram: Double?
-  var memoryUsedBytes: Double?; var memoryTotalBytes: Double?
-  var diskUsedBytes: Double?; var diskTotalBytes: Double?
-  var gpus: [GPUReading]; var network: [NetworkRate]; var warnings: [String]
-  func isStale(now: Date, interval: TimeInterval) -> Bool
-}
-struct RawMetrics: Sendable { /* collector fields owned by core */ }
-enum MetricsParser { static func parse(_ output: String, timestamp: Date) throws -> RawMetrics }
-enum MetricsCalculator { static func calculate(current: RawMetrics, previous: RawMetrics?) -> MetricsSnapshot }
-```
+## InfraCore
 
-TerminalBridge module interface supplied by root:
-```swift
-@MainActor public final class TerminalHost: ObservableObject {
-  public init()
-  public var error: String? { get }
-  public func open(id: UUID, command: String, environment: [String: String] = [:]) // preserve existing surface for same id
-  public func disconnect(id: UUID) // releases local surface only
-  public func disconnectAll()
-}
-public struct TerminalPane: NSViewRepresentable {
-  public init(host: TerminalHost, id: UUID)
-}
-```
-UI owns `@MainActor AppModel: ObservableObject`, `public struct InfraRootView: View` init() with state, scheduler, persistence.
-`InfraRootView` owns `TerminalHost` and opens remote terminal commands only on explicit open/reconnect; app launch must not create new remote sessions silently. The selected local tab may start its local shell immediately.
-UI module entry `InfraRootView()` exposed public; App main calls it. Settings can be in root view sheets.
+| 책임 | 구현 | 경계 |
+| --- | --- | --- |
+| 프로필·계정·탭·상태 | [Models.swift](../Sources/InfraCore/Models.swift) | UUID identity, 버전 있는 Codable 상태, 누락된 kind/auth 기본값, 원자적 저장·손상 보존 |
+| 셸·SSH/tmux 명령 | [SSHCommands.swift](../Sources/InfraCore/SSHCommands.swift) | ShellCommand는 executable/arguments/standardInput/environment. shellString은 모든 인자를 인용한다. cwd나 streaming 이벤트 필드는 없다. |
+| 단기 실행 | [ProcessRunner.swift](../Sources/InfraCore/ProcessRunner.swift) | run 결과는 exitCode/stdout/stderr. 기본 timeout 8초, 합계 출력 1 MiB. 취소·timeout·출력 초과 때 프로세스 그룹 종료·직접 자식 회수. 장시간 작업 API로 사용하지 않는다. |
+| 저장 비밀번호 | [SSHPasswordAuthentication.swift](../Sources/InfraCore/SSHPasswordAuthentication.swift), [KeychainCredentialStore.swift](../Sources/InfraCore/KeychainCredentialStore.swift) | resolveTarget/context가 해석된 대상과 참조를 검증. PasswordCredentialStore는 테스트 주입 경계. 비밀 원문은 JSON·argv·환경에 넣지 않는다. |
+| 앱 생성 키 | [SSHManagedKeys.swift](../Sources/InfraCore/SSHManagedKeys.swift) | 참조·키 경로·setup/unlock/verification 명령. 입력/해석된 대상 바인딩과 검증된 agent socket 사용. 암호는 native 터미널에서만 입력. |
+| 측정값 | [Metrics.swift](../Sources/InfraCore/Metrics.swift) | 비율은 0…1 Double?, nil은 unknown. 개별 DiskReading/GPUReading/NetworkRate와 기존 요약을 구분. Parser와 Calculator는 수집·화면에서 분리. |
+| 현재 Mac | [LocalMachine.swift](../Sources/InfraCore/LocalMachine.swift) | 예약 UUID, 기존 순서를 보존하는 ensureLocalMachine, 로컬 셸·CPU/RAM/마운트 수집. SSH builder는 local 거부. |
 
-연결 라우팅: `kind`가 없는 기존 v1 프로필은 `ssh`로 decode한다. `local`은 예약된 단일 Mac 프로필에만 허용하며 SSH builder는 모두 거부한다. AppModel은 로컬 셸과 지표를 직접 라우팅하고 선택한 로컬 탭만 자동으로 셸을 연다. 원격 SSH/tmux 세션은 명시적인 사용자 동작에서만 연다.
+SSHCommandBuilder의 terminal/probe/monitor는 optional authentication, manualAuthentication, managedKeyAgentSocket 및 테스트용 managedKeyRootURL을 받는다. managedKey의 격리 정책을 임의 Ansible inventory에 그대로 적용하면 경유·별칭 설정이 사라지므로 후속 연동이 이 builder를 일반 Ansible 인증기로 재사용해서는 안 된다.
 
-로컬 셸의 홈·실행 경로는 고정 스크립트의 위치 인자로 전달한다. 로컬 CPU는 두 표본 차분, RAM은 캐시를 포함한 active+inactive+wired+compressed 페이지, 디스크는 홈의 단일 볼륨 용량이다. APFS 공유 용량을 여러 볼륨에서 합산하지 않는다. 로컬 GPU/VRAM/네트워크는 nil 또는 빈 배열로 미지원 상태를 유지한다.
+Keychain context의 allowsKeychainInteraction 기본값은 false다. 비밀 없는 정책 LULUTERMINAL_KEYCHAIN_UI=allow|fail을 독립 도우미에 전달한다. 명시 연결의 probe와 terminal만 true, 모니터링은 false다. keychainAccessRequired와 비밀 없는 stderr marker로 일반 인증 실패를 구분한다. 도우미는 자신의 프로세스에서만 UI 정책을 적용하고 종료한다.
 
+## InfraTerminalUI
 
-저장 비밀번호 인증은 `SSHPasswordAuthentication.resolveTarget`으로 SSH 별칭을 확인하고, `context`로 저장 대상 일치를 검증한 뒤 `SSHCommandBuilder`의 `authentication` 인자로 전달한다. `manualAuthentication: true`는 기존 대화형 인증 경로다. `PasswordCredentialStore`는 키체인 저장·읽기·삭제의 테스트 경계이며 JSON 모델은 비밀번호를 포함하지 않는다. `ShellCommand.environment`는 비밀 없는 askpass 경로와 대상 참조만 전달한다. 번들의 `luluTerminalAskPass` wrapper가 독립 `luluTerminalKeychain --ssh-askpass` 도우미를 실행한다. 앱 실행파일의 기존 진입점은 호환성을 위해 유지한다. `SSHAuthenticationContext(... allowsKeychainInteraction: Bool = false)`와 `context`의 같은 인자는 비밀 없는 `LULUTERMINAL_KEYCHAIN_UI=allow|fail` 정책을 전달한다. 기본은 fail이며 사용자 명시 연결에서만 true를 전달한다. 사전 확인과 실제 터미널은 별도 SSH 프로세스라서 둘 다 명시 정책을 유지한다. 수집은 항상 기본값 false다. 도우미는 전역 Keychain UI 설정을 자신의 프로세스에만 적용하며 한 번 조회 후 종료한다. `KeychainCredentialStore.read(reference:)`도 기본적으로 UI를 금지한다. 권한 오류는 `SSHPasswordError.keychainAccessRequired` 및 비밀 없는 stderr marker로 전달하며, SSH 255에서 일반 비밀번호 오류와 구분한다. 기존 항목 키·payload·대상 검증은 바꾸지 않는다.
+[AppModel.swift](../Sources/InfraTerminalUI/AppModel.swift)는 MainActor에서 프로필·탭·저장·인증·수집을 조정한다. 실행기·credential store·상태 URL은 테스트에서 주입한다. 잘못되거나 오래된 async 결과가 최신 프로필과 세션을 바꾸지 않도록 대상과 token을 재검증한다.
 
+managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 모두 성공해야 한다. 설정 터미널 종료 자체는 성공 신호가 아니다. 기존 password 참조는 휴면 상태로 보존하고 managedKey 경로에서 읽지 않는다.
 
-앱 생성 키 인증은 `SSHAuthenticationMethod.managedKey`와 선택적 `SSHAccount.managedKey`를 사용한다. `SSHManagedKeyReference(id: UUID = UUID(), target: SSHPasswordTarget)`는 비밀 없는 계정/대상 바인딩이다. `SSHManagedKeys`는 `keyURL(for:rootURL:)`, `validate(reference:server:account:)`, `setupCommand(server:account:reference:agentSocket:rootURL:)`, `unlockCommand(reference:agentSocket:rootURL:)`, `verificationCommand(server:account:reference:agentSocket:rootURL:)`를 제공한다. 명령은 ShellCommand이며 암호를 인자나 환경으로 받지 않는다.
+[InfraRootView.swift](../Sources/InfraTerminalUI/InfraRootView.swift)는 선택한 로컬 셸을 열 수 있지만 원격 새 세션은 명시적 동작에서만 만든다. 외관·모니터링 설정은 workspace JSON과 별도다. [ResourceInterpolation.swift](../Sources/InfraTerminalUI/ResourceInterpolation.swift)는 표시만 보간하며 새 수집 타이머를 만들지 않는다.
 
-SSH terminal/probe/monitor builder에는 선택적 `managedKeyAgentSocket`과 테스트용 `managedKeyRootURL`을 전달한다. AppModel은 별칭을 다시 해석하고 원래 target과 일치하는지 검증한 뒤 동일한 agent socket을 전달한다. 생성/잠금 해제 시트의 터미널 종료는 성공 신호가 아니며, 독립 검증 성공과 대상 재확인·상태 저장 성공이 인증 전환 조건이다. 기존 비밀번호 참조는 휴면 상태로 보존하며 managedKey 경로에서는 읽지 않는다.
+## TerminalBridge
+
+[TerminalHost.swift](../Sources/TerminalBridge/TerminalHost.swift)의 public 경계는 open(id:command:environment:), disconnect(id:), disconnectAll(), error, onExit, onOpenSettings다. TerminalPane(host:id:)가 해당 native view를 표시한다.
+
+동일 UUID를 열면 surface·PTY·스크롤 기록을 재사용한다. 종료는 native callback 반환 뒤 해제하며 generation이 다르면 새 연결을 건드리지 않는다. 외관·폰트 변경은 기존 controller와 surface에 적용한다.
+
+**onExit는 UUID만 전달하며 프로세스 종료 코드가 아니다.** 후속 Ansible 실행 성공 판단에 사용하지 않는다. 별도 작업 supervisor의 waitpid 결과가 필요하며 기존 SSH 탭 모델과 작업 실행 모델을 분리한다.
+
+## 검사·예정 인터페이스
+
+현재 API는 [TESTING](TESTING.md)의 자동 검사와 [VERIFICATION](VERIFICATION.md)의 수락 범위를 따른다. [Ansible 설계](ANSIBLE_DESIGN.md)의 JobPlan·supervisor·event adapter는 아직 코드에 없는 제안이다. 이번 정리로 public API를 변경하지 않았다.

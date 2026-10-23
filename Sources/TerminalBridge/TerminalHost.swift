@@ -22,6 +22,7 @@ import GhosttyTerminal
         return controller
     }()
     private struct Entry {
+        let generation: UUID
         let view: TerminalView
         let events: SurfaceEvents
     }
@@ -29,14 +30,20 @@ import GhosttyTerminal
     private var style = TerminalStyle.default
     public init() {}
 
-    /// Switching tabs reuses the view, PTY, and scrollback. Only explicit
-    /// disconnect/reconnect may replace a surface with this identity.
+    /// Switching tabs reuses the view, PTY, and scrollback. Disconnecting or
+    /// a native terminal close releases the surface with this identity.
     public func open(id: UUID, command: String, environment: [String: String] = [:]) {
         guard entries[id] == nil else { return }
         let view = HostTerminalView(frame: .zero)
         view.onOpenSettings = { [weak self] in self?.onOpenSettings?() }
+        let generation = UUID()
         let events = SurfaceEvents { [weak self] in
-            self?.onExit?(id)
+            // Free the surface only after Ghostty's native close callback returns.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.entries[id]?.generation == generation else { return }
+                self.disconnect(id: id)
+                self.onExit?(id)
+            }
         }
         view.delegate = events
         view.controller = controller
@@ -49,7 +56,7 @@ import GhosttyTerminal
         view.setAccessibilityLabel("터미널")
         error = controller.lastConfigurationIssue
         objectWillChange.send()
-        entries[id] = Entry(view: view, events: events)
+        entries[id] = Entry(generation: generation, view: view, events: events)
     }
 
     /// Releasing the local Ghostty PTY closes SSH. It sends no remote

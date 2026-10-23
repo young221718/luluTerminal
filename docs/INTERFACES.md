@@ -7,7 +7,8 @@
 struct SSHAccount: Identifiable, Codable, Equatable, Sendable {
   var id: UUID; var username: String
   var authMethod: SSHAuthenticationMethod; var credential: SSHPasswordReference?
-  init(id: UUID = UUID(), username: String, authMethod: SSHAuthenticationMethod = .system, credential: SSHPasswordReference? = nil)
+  var managedKey: SSHManagedKeyReference?
+  init(id: UUID = UUID(), username: String, authMethod: SSHAuthenticationMethod = .system, credential: SSHPasswordReference? = nil, managedKey: SSHManagedKeyReference? = nil)
 }
 enum ServerConnectionKind: String, Codable, Sendable { case ssh, local }
 struct ServerProfile: Identifiable, Codable, Equatable, Sendable {
@@ -109,3 +110,8 @@ UI module entry `InfraRootView()` exposed public; App main calls it. Settings ca
 
 
 저장 비밀번호 인증은 `SSHPasswordAuthentication.resolveTarget`으로 SSH 별칭을 확인하고, `context`로 저장 대상 일치를 검증한 뒤 `SSHCommandBuilder`의 `authentication` 인자로 전달한다. `manualAuthentication: true`는 기존 대화형 인증 경로다. `PasswordCredentialStore`는 키체인 저장·읽기·삭제의 테스트 경계이며 JSON 모델은 비밀번호를 포함하지 않는다. `ShellCommand.environment`는 비밀 없는 askpass 경로와 대상 참조만 전달한다. 번들의 `luluTerminalAskPass` wrapper가 독립 `luluTerminalKeychain --ssh-askpass` 도우미를 실행한다. 앱 실행파일의 기존 진입점은 호환성을 위해 유지한다. `SSHAuthenticationContext(... allowsKeychainInteraction: Bool = false)`와 `context`의 같은 인자는 비밀 없는 `LULUTERMINAL_KEYCHAIN_UI=allow|fail` 정책을 전달한다. 기본은 fail이며 사용자 명시 연결에서만 true를 전달한다. 사전 확인과 실제 터미널은 별도 SSH 프로세스라서 둘 다 명시 정책을 유지한다. 수집은 항상 기본값 false다. 도우미는 전역 Keychain UI 설정을 자신의 프로세스에만 적용하며 한 번 조회 후 종료한다. `KeychainCredentialStore.read(reference:)`도 기본적으로 UI를 금지한다. 권한 오류는 `SSHPasswordError.keychainAccessRequired` 및 비밀 없는 stderr marker로 전달하며, SSH 255에서 일반 비밀번호 오류와 구분한다. 기존 항목 키·payload·대상 검증은 바꾸지 않는다.
+
+
+앱 생성 키 인증은 `SSHAuthenticationMethod.managedKey`와 선택적 `SSHAccount.managedKey`를 사용한다. `SSHManagedKeyReference(id: UUID = UUID(), target: SSHPasswordTarget)`는 비밀 없는 계정/대상 바인딩이다. `SSHManagedKeys`는 `keyURL(for:rootURL:)`, `validate(reference:server:account:)`, `setupCommand(server:account:reference:agentSocket:rootURL:)`, `unlockCommand(reference:agentSocket:rootURL:)`, `verificationCommand(server:account:reference:agentSocket:rootURL:)`를 제공한다. 명령은 ShellCommand이며 암호를 인자나 환경으로 받지 않는다.
+
+SSH terminal/probe/monitor builder에는 선택적 `managedKeyAgentSocket`과 테스트용 `managedKeyRootURL`을 전달한다. AppModel은 별칭을 다시 해석하고 원래 target과 일치하는지 검증한 뒤 동일한 agent socket을 전달한다. 생성/잠금 해제 시트의 터미널 종료는 성공 신호가 아니며, 독립 검증 성공과 대상 재확인·상태 저장 성공이 인증 전환 조건이다. 기존 비밀번호 참조는 휴면 상태로 보존하며 managedKey 경로에서는 읽지 않는다.

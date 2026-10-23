@@ -19,6 +19,7 @@ public struct InfraRootView: View {
     @ViewState private var renamedTitle = ""
     @ViewState private var actionError: String?
     @ViewState private var creatingSessionFor: TerminalTab?
+    @ViewState private var keySetupRequest: SSHKeySetupRequest?
 
     @ViewState private var sidebarDragWidth: Double?
     @ViewState private var inspectorDragWidth: Double?
@@ -99,6 +100,9 @@ public struct InfraRootView: View {
                 for tab in model.workspace.tabs where tab.serverID == profile.id { terminal.disconnect(id: tab.id) }
             }
             .id(editingProfile?.id)
+        }
+        .sheet(item: $keySetupRequest) { request in
+            SSHKeySetupView(model: model, request: request).id(request.id)
         }
         .sheet(isPresented: $showNewTab) {
             if let server = model.selectedServer {
@@ -198,7 +202,12 @@ public struct InfraRootView: View {
             .help("드래그하여 서버 순서 변경")
             .accessibilityElement(children: .contain)
             .accessibilityAddTraits(model.workspace.selectedServerID == server.id ? [.isSelected] : [])
-            .contextMenu { if server.kind == .ssh { Button("서버 편집…") { editingProfile = server; showProfile = true } } }
+            .contextMenu {
+                if server.kind == .ssh {
+                    Button("서버 편집…") { editingProfile = server; showProfile = true }
+                    sshKeyActions(server)
+                }
+            }
     }
 
     private var workspace: some View {
@@ -256,7 +265,10 @@ public struct InfraRootView: View {
                 }
             }
             Menu {
-                if server.kind == .ssh { Button("서버 편집…") { editingProfile = server; showProfile = true } }
+                if server.kind == .ssh {
+                    Button("서버 편집…") { editingProfile = server; showProfile = true }
+                    sshKeyActions(server)
+                }
                 Button(server.kind == .local ? "새 로컬 셸 탭" : "새 세션 만들기…") {
                     if server.kind == .local { showNewTab = true }
                     else if let tab = model.selectedTab { creatingSessionFor = tab }
@@ -326,7 +338,11 @@ public struct InfraRootView: View {
                             if model.account(for: tab)?.authMethod == .password {
                                 Button("비밀번호 재시도") { connect(tab, create: false, retryAuthentication: true) }
                             }
-                            Button("터미널에서 인증") { connect(tab, create: false, interactive: true) }
+                            if model.account(for: tab)?.authMethod == .managedKey {
+                                Button("SSH 키 잠금 해제") { keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: tab.accountID, unlock: true) }
+                            } else {
+                                Button("터미널에서 인증") { connect(tab, create: false, interactive: true) }
+                            }
                         }
                     }.font(.caption).frame(maxWidth: .infinity, alignment: .leading).padding(12).background(Color.orange.opacity(0.12))
                 }
@@ -359,6 +375,25 @@ public struct InfraRootView: View {
         Label(text, systemImage: icon).font(.caption).foregroundStyle(color).textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.vertical, 10).background(color.opacity(0.08))
     }
+    @ViewBuilder private func sshKeyActions(_ server: ServerProfile) -> some View {
+        Menu("SSH 키 설정") {
+            ForEach(server.accounts) { account in
+                Button(account.username) {
+                    keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: account.id)
+                }
+            }
+        }.disabled(model.isDemo)
+        if server.accounts.contains(where: { $0.managedKey != nil }) {
+            Menu("SSH 키 잠금 해제") {
+                ForEach(server.accounts.filter { $0.managedKey != nil }) { account in
+                    Button(account.username) {
+                        keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: account.id, unlock: true)
+                    }
+                }
+            }.disabled(model.isDemo)
+        }
+    }
+
     private func connect(_ tab: TerminalTab, create: Bool, interactive: Bool = false, retryAuthentication: Bool = false) {
         terminal.disconnect(id: tab.id)
         Task {

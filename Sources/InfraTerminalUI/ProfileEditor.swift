@@ -30,7 +30,7 @@ struct ProfileEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text(isNew ? "서버 추가" : "서버 편집").font(.title2.weight(.semibold))
-            Text("계정마다 SSH 키 또는 저장한 비밀번호로 연결합니다.").font(.caption).foregroundStyle(appearance.colors.muted)
+            Text("새 SSH 키는 서버를 저장한 뒤 서버 메뉴의 ‘SSH 키 설정’에서 생성·등록하세요.").font(.caption).foregroundStyle(appearance.colors.muted)
             Form {
                 TextField("서버 별칭", text: $profile.name)
                 TextField("SSH IP(SSH 저장명)", text: $profile.host)
@@ -56,8 +56,15 @@ struct ProfileEditor: View {
                             }
                             Picker("인증 방식", selection: $account.authMethod) {
                                 Text("SSH 키·기존 설정").tag(SSHAuthenticationMethod.system)
+                                if account.managedKey != nil {
+                                    Text("앱에서 설정한 SSH 키").tag(SSHAuthenticationMethod.managedKey)
+                                }
                                 Text("저장한 비밀번호").tag(SSHAuthenticationMethod.password)
                             }.disabled(demo)
+                            if account.authMethod == .managedKey {
+                                Text("설정한 키를 사용합니다. 키 암호가 필요하면 서버 메뉴의 ‘SSH 키 잠금 해제’를 선택하세요. 연결 대상을 바꾸려면 먼저 ‘SSH 키·기존 설정’으로 저장한 뒤 새 키를 설정하세요.")
+                                    .font(.caption).foregroundStyle(appearance.colors.muted)
+                            }
                             if account.authMethod == .password {
                                 SecureField(hasSavedPassword(account) ? "새 비밀번호 · 비워두면 유지" : "비밀번호", text: passwordBinding(account.id))
                                     .labelsHidden()

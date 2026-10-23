@@ -146,6 +146,42 @@ import Testing
         #expect(view.configuration.envVars["SSH_ASKPASS_REQUIRE"] == "force")
     }
 
+    @Test func terminalExitReleasesItsViewAfterTheNativeCallbackReturns() async throws {
+        let host = TerminalHost()
+        let exitedID = UUID(), liveID = UUID()
+        host.open(id: exitedID, command: "/usr/bin/true")
+        host.open(id: liveID, command: "/usr/bin/true")
+        defer { host.disconnectAll() }
+        weak var released = host.view(for: exitedID)
+        var notifications: [UUID] = []
+        host.onExit = { notifications.append($0) }
+        let callback = try #require(host.view(for: exitedID)?.delegate as? any TerminalSurfaceCloseDelegate)
+        callback.terminalDidClose(processAlive: false)
+        #expect(host.view(for: exitedID) != nil, "Native callback must finish before freeing its surface")
+        await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        #expect(host.view(for: exitedID) == nil)
+        #expect(released == nil)
+        #expect(host.view(for: liveID) != nil)
+        #expect(notifications == [exitedID])
+    }
+
+    @Test func delayedExitCannotDisconnectAReplacementWithTheSameTabID() async throws {
+        let host = TerminalHost()
+        let id = UUID()
+        host.open(id: id, command: "/usr/bin/true")
+        let callback = try #require(host.view(for: id)?.delegate as? any TerminalSurfaceCloseDelegate)
+        var notifications: [UUID] = []
+        host.onExit = { notifications.append($0) }
+        callback.terminalDidClose(processAlive: false)
+        host.disconnect(id: id)
+        host.open(id: id, command: "/bin/echo replacement")
+        let replacement = host.view(for: id)
+        defer { host.disconnectAll() }
+        await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        #expect(host.view(for: id) === replacement)
+        #expect(notifications.isEmpty)
+    }
+
     @Test func disconnectReleasesOnlyTheNamedSurface() {
         let host = TerminalHost()
         let a = UUID(), b = UUID()

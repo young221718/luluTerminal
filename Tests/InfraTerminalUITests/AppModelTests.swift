@@ -129,6 +129,6 @@ private actor FailedProbeRecorder {
     private(set) var commands: [ShellCommand] = []
     func run(_ command: ShellCommand) -> ProcessResult {
         commands.append(command)
-        return ProcessResult(exitCode: 255, stdout: "", stderr: "fixture: interactive authentication required")
+        return ProcessResult(exitCode: 255, stdout: "", stderr: "trainer@example.invalid: Permission denied (publickey,password).")
     }
 }

@@ -267,7 +267,7 @@ private let passwordFixture: SSHCommandExecutor = { command, timeout in
 
 private actor PasswordFailureRecorder {
     private let stderr: String
-    init(stderr: String = "fixture SSH failure") { self.stderr = stderr }
+    init(stderr: String = "trainer@example.invalid: Permission denied (publickey,password).") { self.stderr = stderr }
     private(set) var commands: [ShellCommand] = []
     func run(_ command: ShellCommand) -> ProcessResult {
         commands.append(command)

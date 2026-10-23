@@ -18,14 +18,24 @@ public struct TerminalPane: NSViewRepresentable {
         host.setStyle(style)
         host.setColorScheme(colorScheme == .dark ? .dark : .light)
         let container = TerminalContainer()
-        container.show(host.view(for: id))
+        show(in: container)
         return container
     }
 
     public func updateNSView(_ nsView: NSView, context: Context) {
         host.setStyle(style)
         host.setColorScheme(colorScheme == .dark ? .dark : .light)
-        (nsView as? TerminalContainer)?.show(host.view(for: id))
+        if let container = nsView as? TerminalContainer { show(in: container) }
+    }
+
+    private func show(in container: TerminalContainer) {
+        let host = self.host
+        let id = self.id
+        let view = host.view(for: id)
+        container.show(view, isCurrent: { [weak host, weak view] in
+            guard let host, let view else { return false }
+            return host.view(for: id) === view
+        })
     }
 
     public static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
@@ -36,7 +46,7 @@ public struct TerminalPane: NSViewRepresentable {
 @MainActor final class TerminalContainer: NSView {
     private weak var terminal: TerminalView?
 
-    func show(_ next: TerminalView?) {
+    func show(_ next: TerminalView?, isCurrent: @escaping () -> Bool = { true }) {
         if terminal === next, next == nil || next?.superview === self { return }
         // SwiftUI can attach a cached surface to its new container before
         // dismantling the old one. Only its current owner may hide/remove it.
@@ -52,8 +62,12 @@ public struct TerminalPane: NSViewRepresentable {
         addSubview(next)
         next.setSurfaceVisible(true)
         DispatchQueue.main.async { [weak self, weak next] in
-            guard let self, let next, self.terminal === next, next.superview === self else { return }
-            self.window?.makeFirstResponder(next)
+            guard let self, let next, self.terminal === next, next.superview === self, isCurrent(),
+                  let window = self.window, window.isKeyWindow, window.attachedSheet == nil else { return }
+            // Search and quick-switch text fields own focus until explicitly closed.
+            if let responder = window.firstResponder,
+               responder !== window, responder !== self, !(responder is TerminalView) { return }
+            window.makeFirstResponder(next)
         }
     }
 }

@@ -261,7 +261,7 @@ private struct GeneralSettings: View {
         Form {
             Section("터미널과 저장") {
                 LabeledContent("터미널 엔진", value: "Ghostty")
-                LabeledContent("인증", value: "앱 생성 SSH 키(키체인 미사용) · 기존 SSH 설정 · 저장 비밀번호")
+                LabeledContent("인증", value: "앱 생성 SSH 키 · 기존 SSH 설정 · 터미널 직접 인증")
                 Text("탭 닫기와 연결 해제는 로컬 연결만 닫습니다. 원격 tmux 작업은 종료하지 않습니다.")
                     .font(.caption).foregroundStyle(appearance.colors.muted)
                 Text(demo ? "데모 모드 · 실사용 저장 파일을 변경하지 않음" : storeURL.path)

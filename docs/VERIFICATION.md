@@ -2,6 +2,18 @@
 
 현재 요구는 [SPEC](SPEC.md), 검사 책임·명령은 [TESTING](TESTING.md)을 따른다. 정리 전 전체 검증 기록은 [원문 이력](history/VERIFICATION-before-organization-2026-10-23.md)에 보존했다. 과거 관찰과 이번 실행을 구분한다.
 
+## 2026-10-23 키체인 완전 제거
+
+- 이전 저장 비밀번호 인증·Keychain API·askpass 도우미·비밀번호 편집 화면을 제거했다. 아래 이전 검증 기록에 등장하는 Keychain 동작과 도우미는 당시의 관찰이며 현행 기능이 아니다.
+- 구현 전 legacy JSON 변환·명령 정책 검사 2개에서 17개 이슈를 관찰했다. 기존 배포 번들에는 `scripts/check-no-keychain.py`가 도우미 2개와 Keychain API import 4개를 검출하며 실패했다. 수정 후 모두 통과했다.
+- 최종 `bash scripts/test.sh`: **156개 테스트 / 21개 suite 통과**, 3.309초. Core 47 / UI 86 / Bridge 23. 폐기 기능 전용 검사는 legacy 변환·수동 인증·원자적 저장·인증 경합/취소 검사로 대체했다. 관리 키의 실제 임시 Ed25519 생성·암호 설정·별도 agent·PTY 등록 fixture도 통과했다.
+- 독립 읽기 전용 검토에서 마이그레이션·명령 옵션·수동 인증·상태 저장·비동기 무효화·패키징 경로를 확인했고 추가 actionable finding은 없었다. `git diff --check` 통과.
+- `bash scripts/build-app.sh` release 빌드, 21개 라이선스, 키체인 미포함 검사, `codesign --verify --deep --strict` 통과. 기존 native SwiftPM 폐기 경고와 테스트 weak 변수 경고는 남아 있다. Keychain API 폐기 경고는 해당 코드 제거 후 발생하지 않았다.
+- 기존 `/Applications/luluTerminal.app`만 교체했다. 이전 앱 ZIP 검증 완료, 설치본 54개 파일이 빌드본과 일치, 실행 전 workspace JSON SHA-256 유지. 최종 실행파일 SHA-256: `35b3b3f44a45615417aebfc4eda35a2474eabdab07f41bb4a1017531880dacd4`.
+- 실제 설치 앱에서 기존 서버 5대와 계정·탭을 확인했다. 서버 편집의 비밀번호 입력칸·저장 비밀번호 선택지가 없고, 기존 비밀번호 계정이 ‘SSH 키·기존 설정’으로 표시된다. SSH 키 설정 메뉴는 유지됐다. 설정 변경 없이 취소하고 기존 로컬 탭으로 복귀했다.
+- 사용자 요청에 따라 이 Mac의 기본 키체인 검색 범위에서 앱 전용 service `com.luluterminal.ssh.password` 항목 3개를 삭제했다. 같은 서비스의 후속 삭제 조회가 항목 없음으로 종료되어 잔여 0개를 확인했다. 비밀번호 값은 읽거나 출력하지 않았고 다른 service는 건드리지 않았다. 새 앱에는 이 정리 로직이나 Keychain 접근 코드가 없다.
+- 실제 서버 비밀번호 로그인·공개 키 등록과 재부팅 후 agent 잠금 해제는 이번 검사에서 수행하지 않았다. 사용자 OpenSSH ProxyCommand/ProxyJump가 별도로 실행하는 임의 하위 명령까지 앱의 SSH 옵션으로 통제한다고 주장하지 않는다. CI·Developer ID·공증은 미검증이다.
+
 ## 2026-10-23 연결 복구·검색·빠른 이동
 
 - 최종 `bash scripts/test.sh`: **168개 테스트 / 23개 suite 통과**, 3.297초. Core 49 / UI 96 / Bridge 23. 기존 128개를 보존하고 실패 분류·복구 경합·검색·빠른 이동·native 입력을 추가했다.
@@ -44,15 +56,14 @@
 
 - 실제 서버의 최초 공개 키 등록·지정 키 인증, 로그인·agent 초기화 후 잠금 해제와 장시간 수집.
 - 한국어 IME 조합 입력, VoiceOver, Intel 실기기, 네트워크 장애·긴 실행의 복구.
-- 기존 password 경로의 실제 macOS 허용/항상 허용/거부/잠김 수명. 주입 API 검사로 OS 동작을 단정하지 않는다.
-- CI·Developer ID·공증·자동 업데이트 및 Ansible 실행기. 각각 실제 결과가 생긴 시점에 추가한다.
+- CI·Developer ID·공증·자동 업데이트. 각각 실제 결과가 생긴 시점에 추가한다. 기존 password/Keychain 경로와 Ansible 실행기는 사용자 결정으로 제거·취소되어 현재 수락 대상이 아니다.
 
 ## 재검증 진입점
 
 ```bash
 bash scripts/test.sh
 bash scripts/build-app.sh
-python3 scripts/test-askpass-helper.py --app 'dist/Infra Terminal.app'
+python3 scripts/check-no-keychain.py --app 'dist/Infra Terminal.app'
 ```
 
-자동 검사는 임시 fixture를 사용한다. release 빌드와 도우미 검사는 코드·패키징 변경 때 수행하며 테스트·문서만 정리할 때 새 앱 설치를 요구하지 않는다. 실서버 접속은 명시적으로 승인된 대상과 범위를 따른다.
+자동 검사는 임시 fixture를 사용한다. release 빌드와 키체인 미포함 검사는 코드·패키징 변경 때 수행하며 테스트·문서만 정리할 때 새 앱 설치를 요구하지 않는다. 실서버 접속은 명시적으로 승인된 대상과 범위를 따른다.

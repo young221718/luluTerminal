@@ -39,32 +39,3 @@ actor SuspendedCollector {
         for continuation in waiting { continuation.resume() }
     }
 }
-
-final class TestPasswordStore: PasswordCredentialStore, @unchecked Sendable {
-    private let lock = NSLock()
-    private var entries: [UUID: String] = [:]
-    private var savedIDs: [UUID] = []
-    private var deletedIDs: [UUID] = []
-    private var reads: [UUID] = []
-    var readIDs: [UUID] { lock.withLock { reads } }
-    var failSave = false
-    var saved: [UUID] { lock.withLock { savedIDs } }
-    var deleted: [UUID] { lock.withLock { deletedIDs } }
-    func save(_ password: String, reference: SSHPasswordReference) throws {
-        try lock.withLock {
-            if failSave { throw CocoaError(.fileWriteNoPermission) }
-            entries[reference.id] = password
-            savedIDs.append(reference.id)
-        }
-    }
-    func read(reference: SSHPasswordReference) throws -> String {
-        try lock.withLock {
-            reads.append(reference.id)
-            guard let value = entries[reference.id] else { throw CocoaError(.fileNoSuchFile) }
-            return value
-        }
-    }
-    func delete(reference: SSHPasswordReference) throws {
-        lock.withLock { entries[reference.id] = nil; deletedIDs.append(reference.id) }
-    }
-}

@@ -5,10 +5,10 @@ configuration="${CONFIGURATION:-release}"
 swift build --build-system native -c "$configuration" --product InfraTerminal
 bin_dir="$(swift build --build-system native -c "$configuration" --show-bin-path)"
 app="$PWD/dist/Infra Terminal.app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources/Licenses"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Licenses"
 cp "$bin_dir/InfraTerminal" "$app/Contents/MacOS/InfraTerminal"
-install -m 755 scripts/luluTerminalAskPass "$app/Contents/Helpers/luluTerminalAskPass"
-bash scripts/build-askpass-helper.sh "$app/Contents/Helpers/luluTerminalKeychain"
+# Incremental builds must not ship helpers left by older app bundles.
+rm -f "$app/Contents/Helpers/luluTerminalAskPass" "$app/Contents/Helpers/luluTerminalKeychain"
 bash scripts/make-icon.sh Resources/AppIcon.png "$app/Contents/Resources/AppIcon.icns"
 for resource in "$bin_dir"/*.bundle; do
     [ -d "$resource" ] || continue
@@ -45,8 +45,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
   <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST
-# Sign the wrapper separately; preserve the already signed Keychain helper.
-codesign --force --sign - "$app/Contents/Helpers/luluTerminalAskPass"
+python3 scripts/check-no-keychain.py --app "$app"
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"
 printf '%s\n' "$app"

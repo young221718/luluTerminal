@@ -18,13 +18,11 @@ extension AppModelTests {
         #expect(model.dueServerIDs(now: Date().addingTimeInterval(30)).contains(profile.id))
     }
 
-    @Test func testPasswordTerminalExitAfterManagedActivationKeepsMonitoringAvailable() async throws {
+    @Test func testExistingTerminalExitAfterManagedActivationKeepsMonitoringAvailable() async throws {
         let fixture = ManagedKeyFixture(sessionProbeExitCode: 0)
-        let model = AppModel(demo: false, storeURL: temporaryURL(), helperPath: "/usr/bin/true",
+        let model = AppModel(demo: false, storeURL: temporaryURL(),
                              agentEnvironment: ["SSH_AUTH_SOCK": "/tmp/fixture-agent"]) { command, _ in await fixture.run(command) }
-        var profile = server()
-        profile.accounts[0].authMethod = .password
-        profile.accounts[0].credential = SSHPasswordReference(target: SSHPasswordTarget(server: profile, account: profile.accounts[0], resolvedHost: "example.invalid"))
+        let profile = server()
         try model.saveProfile(profile)
         let tab = try model.addTab(serverID: profile.id, accountID: profile.accounts[0].id, title: "Keep running")
         #expect(await model.prepareConnection(tabID: tab.id, create: false) != nil)
@@ -36,29 +34,24 @@ extension AppModelTests {
         #expect(model.dueServerIDs(now: Date().addingTimeInterval(30)).contains(profile.id))
     }
 
-    @Test func testManagedKeyActivationPreservesCredentialAndTabsWithoutKeychainAccess() async throws {
-        let store = TestPasswordStore()
+    @Test func testManagedKeyActivationPreservesTabsAndPersistsOnlyKeyReference() async throws {
         let fixture = ManagedKeyFixture()
         let url = temporaryURL()
-        let model = AppModel(demo: false, storeURL: url, credentialStore: store,
+        let model = AppModel(demo: false, storeURL: url,
                              agentEnvironment: ["SSH_AUTH_SOCK": "/tmp/fixture-agent"]) { command, _ in
             await fixture.run(command)
         }
-        var profile = server()
-        let credential = SSHPasswordReference(target: SSHPasswordTarget(server: profile, account: profile.accounts[0], resolvedHost: "example.invalid"))
-        profile.accounts[0].authMethod = .password
-        profile.accounts[0].credential = credential
+        let profile = server()
         try model.saveProfile(profile)
         let tab = try model.addTab(serverID: profile.id, accountID: profile.accounts[0].id, title: "Keep session")
         let setup = try await model.prepareSSHKeySetup(serverID: profile.id, accountID: profile.accounts[0].id)
-        #expect(model.workspace.servers.first { $0.id == profile.id }?.accounts[0].authMethod == .password)
+        #expect(model.workspace.servers.first { $0.id == profile.id }?.accounts[0].authMethod == .system)
         try await model.verifyAndApplySSHKeySetup(setup)
         let saved = try #require(model.workspace.servers.first { $0.id == profile.id })
         #expect(saved.accounts[0].authMethod == .managedKey)
         #expect(saved.accounts[0].managedKey == setup.reference)
-        #expect(saved.accounts[0].credential == credential)
         #expect(model.workspace.tabs.contains(tab))
-        #expect(store.saved.isEmpty && store.deleted.isEmpty && store.readIDs.isEmpty)
+        #expect(!String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("credential"))
         let loaded = AppModel(demo: false, storeURL: url)
         #expect(loaded.workspace.servers.first { $0.id == profile.id }?.accounts == saved.accounts)
         let commands = await fixture.commands

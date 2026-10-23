@@ -7,16 +7,13 @@ struct ProfileEditor: View {
     @ViewState private var profile: ServerProfile
     @ViewState private var port: String
     @ViewState private var error: String?
-    @ViewState private var passwords: [UUID: String] = [:]
     @ViewState private var saving = false
-    @ViewState private var koreanInputSource = PasswordInputWarning.currentSourceIsKorean
-    @FocusState private var focusedPasswordAccountID: UUID?
     let lockedAccountIDs: Set<UUID>
     let isNew: Bool
     let demo: Bool
-    let save: (ServerProfile, [UUID: String]) async throws -> Void
+    let save: (ServerProfile) async throws -> Void
 
-    init(profile: ServerProfile?, lockedAccountIDs: Set<UUID>, demo: Bool = false, save: @escaping (ServerProfile, [UUID: String]) async throws -> Void) {
+    init(profile: ServerProfile?, lockedAccountIDs: Set<UUID>, demo: Bool = false, save: @escaping (ServerProfile) async throws -> Void) {
         let account = SSHAccount(username: "")
         let value = profile ?? ServerProfile(name: "", host: "", accounts: [account], monitorAccountID: account.id)
         _profile = State(initialValue: value)
@@ -30,7 +27,7 @@ struct ProfileEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text(isNew ? "서버 추가" : "서버 편집").font(.title2.weight(.semibold))
-            Text("새 SSH 키는 서버를 저장한 뒤 서버 메뉴의 ‘SSH 키 설정’에서 생성·등록하세요.").font(.caption).foregroundStyle(appearance.colors.muted)
+            Text("서버 비밀번호는 저장하지 않습니다. 서버를 저장한 뒤 ‘SSH 키 설정’에서 키를 생성하고, 최초 등록에 필요한 인증은 터미널에서 진행하세요.").font(.caption).foregroundStyle(appearance.colors.muted)
             Form {
                 TextField("서버 별칭", text: $profile.name)
                 TextField("SSH IP(SSH 저장명)", text: $profile.host)
@@ -48,7 +45,6 @@ struct ProfileEditor: View {
                                     Button {
                                         let removed = account.id
                                         profile.accounts.removeAll { $0.id == removed }
-                                        passwords[removed] = nil
                                         if profile.monitorAccountID == removed { profile.monitorAccountID = profile.accounts.first?.id }
                                     } label: { Image(systemName: "minus.circle") }
                                     .buttonStyle(.borderless).accessibilityLabel("\(account.username) 계정 제거")
@@ -59,37 +55,9 @@ struct ProfileEditor: View {
                                 if account.managedKey != nil {
                                     Text("앱에서 설정한 SSH 키").tag(SSHAuthenticationMethod.managedKey)
                                 }
-                                Text("저장한 비밀번호").tag(SSHAuthenticationMethod.password)
                             }.disabled(demo)
                             if account.authMethod == .managedKey {
                                 Text("설정한 키를 사용합니다. 키 암호가 필요하면 서버 메뉴의 ‘SSH 키 잠금 해제’를 선택하세요. 연결 대상을 바꾸려면 먼저 ‘SSH 키·기존 설정’으로 저장한 뒤 새 키를 설정하세요.")
-                                    .font(.caption).foregroundStyle(appearance.colors.muted)
-                            }
-                            if account.authMethod == .password {
-                                SecureField(hasSavedPassword(account) ? "새 비밀번호 · 비워두면 유지" : "비밀번호", text: passwordBinding(account.id))
-                                    .labelsHidden()
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(maxWidth: .infinity)
-                                    .textContentType(.password)
-                                    .accessibilityLabel("\(account.username) SSH 비밀번호")
-                                    .focused($focusedPasswordAccountID, equals: account.id)
-                                if let warning = PasswordInputWarning.message(password: passwords[account.id] ?? "", isFocused: focusedPasswordAccountID == account.id, koreanInputSource: koreanInputSource) {
-                                    Label(warning, systemImage: "exclamationmark.triangle")
-                                        .font(.caption).foregroundStyle(.orange)
-                                }
-                                HStack(alignment: .top) {
-                                    Label(hasSavedPassword(account) ? "이 연결 대상에 저장됨" : "저장할 비밀번호를 입력하세요", systemImage: hasSavedPassword(account) ? "checkmark.circle" : "key")
-                                        .foregroundStyle(appearance.colors.muted)
-                                    Spacer()
-                                    if account.credential != nil {
-                                        Button("저장한 비밀번호 삭제", role: .destructive) {
-                                            account.authMethod = .system
-                                            account.credential = nil
-                                            passwords[account.id] = nil
-                                        }.buttonStyle(.borderless)
-                                    }
-                                }.font(.caption)
-                                Text("macOS 키체인에 보관하며 터미널과 모니터링에 함께 사용합니다. 처음 연결할 때 ‘luluTerminalKeychain’ 요청에서 ‘항상 허용’을 선택하면 자동 연결에 사용할 수 있습니다.")
                                     .font(.caption).foregroundStyle(appearance.colors.muted)
                             }
                         }.padding(.vertical, 4)
@@ -116,17 +84,6 @@ struct ProfileEditor: View {
             }
         }.padding(24).frame(width: 540).interactiveDismissDisabled(saving)
             .background(appearance.colors.panel).foregroundStyle(appearance.colors.text).tint(appearance.colors.accent)
-            .onChange(of: focusedPasswordAccountID) { _, _ in refreshInputSource() }
-            .onReceive(NotificationCenter.default.publisher(for: NSTextInputContext.keyboardSelectionDidChangeNotification)) { _ in refreshInputSource() }
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refreshInputSource() }
-    }
-    private func refreshInputSource() { koreanInputSource = PasswordInputWarning.currentSourceIsKorean }
-    private func hasSavedPassword(_ account: SSHAccount) -> Bool {
-        guard let reference = account.credential, Int(port) == profile.port else { return false }
-        return reference.target.matches(server: profile, account: account)
-    }
-    private func passwordBinding(_ id: UUID) -> Binding<String> {
-        Binding(get: { passwords[id] ?? "" }, set: { passwords[id] = $0 })
     }
     private func submit() {
         guard !saving else { return }
@@ -136,7 +93,7 @@ struct ProfileEditor: View {
         saving = true
         error = nil
         Task { @MainActor in
-            do { try await save(profile, passwords); passwords.removeAll(); dismiss() }
+            do { try await save(profile); dismiss() }
             catch { self.error = error.localizedDescription }
             saving = false
         }

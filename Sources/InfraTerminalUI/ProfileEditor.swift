@@ -32,8 +32,8 @@ struct ProfileEditor: View {
             Text(isNew ? "서버 추가" : "서버 편집").font(.title2.weight(.semibold))
             Text("계정마다 SSH 키 또는 저장한 비밀번호로 연결합니다.").font(.caption).foregroundStyle(appearance.colors.muted)
             Form {
-                TextField("서버 이름", text: $profile.name)
-                TextField("호스트 또는 SSH 별칭", text: $profile.host)
+                TextField("서버 별칭", text: $profile.name)
+                TextField("SSH IP(SSH 저장명)", text: $profile.host)
                 TextField("SSH 포트", text: $port)
                 Section("로그인 계정") {
                     ForEach($profile.accounts) { $account in

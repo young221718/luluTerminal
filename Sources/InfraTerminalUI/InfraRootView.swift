@@ -191,6 +191,11 @@ public struct InfraRootView: View {
             }.buttonStyle(.plain)
         }.padding(.horizontal, 8).frame(height: 53)
             .background(model.workspace.selectedServerID == server.id ? appearance.colors.accent.opacity(0.09) : Color.clear, in: RoundedRectangle(cornerRadius: 7))
+            .modifier(ServerReorderModifier(id: server.id) { draggedID, after in
+                do { try model.moveServer(draggedID, relativeTo: server.id, after: after) }
+                catch { actionError = error.localizedDescription }
+            })
+            .help("드래그하여 서버 순서 변경")
             .accessibilityElement(children: .contain)
             .accessibilityAddTraits(model.workspace.selectedServerID == server.id ? [.isSelected] : [])
             .contextMenu { if server.kind == .ssh { Button("서버 편집…") { editingProfile = server; showProfile = true } } }

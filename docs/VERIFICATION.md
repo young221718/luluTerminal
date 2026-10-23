@@ -8,6 +8,7 @@ macOS 14 이상, Swift 6.2 이상과 Command Line Tools가 필요하다. arm64 m
 bash scripts/test.sh
 bash -n scripts/build-app.sh scripts/make-icon.sh scripts/test.sh
 bash scripts/build-app.sh
+python3 scripts/test-askpass-helper.py --app 'dist/Infra Terminal.app'
 codesign --verify --deep --strict 'dist/Infra Terminal.app'
 open 'dist/Infra Terminal.app'
 ```
@@ -99,3 +100,13 @@ open 'dist/Infra Terminal.app'
 - 이전 앱을 백업하고 기존 `/Applications/luluTerminal.app`에 적용했다. 55개 번들 파일이 빌드와 일치하며 설치 전후 서버·탭 상태 파일 해시가 동일했다. 실제 설치 앱에서 위·아래 드래그, 이 Mac 이동, 저장 순서의 재실행 복원과 새 입력 문구를 확인했다. 확인 후 기존 서버 순서를 복원했다.
 - 실제 마우스 경로에서 동작하는 네이티브 DropDelegate를 사용한다. 별도 드래그 안내선은 추가하지 않았다. VoiceOver로 순서 변경, 다른 macOS 버전 및 CI는 이번 검증 범위 밖이다.
 - 재실행 뒤 이 Mac·3060·gpu5의 기존 탭을 다시 열었다. 3060·gpu5 지표 갱신도 확인했다. 저장 비밀번호를 사용하는 NAS·Label의 자동 확인은 시간 초과되어 실제 SSH 터미널의 비밀번호 입력 화면으로 복구했으며, 최종 인증 완료는 미확인이다. 저장한 비밀번호·대상 설정을 변경하지 않았다.
+
+
+## 2026-10-23 반복 키체인 접근 요청
+
+- 전체 111개 테스트·18개 suite 통과. 주입한 Keychain API로 기본 조회 UI 금지·명시적 조회 허용·대상 바인딩을 검사하고 권한 오류 시 수집 중지와 자격 증명 보존을 확인했다. 명시 연결의 사전 확인과 실제 터미널은 UI를 허용하고 수집은 금지하는 경로를 검사했다. 실제 macOS 허용 수명을 흉내 낸 검사는 아니다.
+- 기존 코드와 문서에 대해 별도 검토를 진행했다. ‘허용’ 후 별도 터미널 조회가 조용히 실패하는 경로를 발견해 명시적 연결 정책을 유지하도록 수정하고, 해당 환경 값의 실패/통과와 후속 검토를 확인했다.
+- `test-askpass-helper.py --app`으로 다른 두 빌드 경로·UI 소스 변경 사이 독립 도우미의 전체 파일 SHA가 동일함을 확인했다. 패키징한 도우미도 새 독립 빌드와 바이트·서명이 일치했고 앱의 엄격한 중첩 서명 검증을 통과했다. 도우미는 SwiftUI·AppKit·Ghostty에 링크하지 않으며 잘못된 직접 호출을 비밀 출력 없이 거부했다. 이 동일성은 같은 Core 소스·툴체인에 한정한다.
+- release 앱 빌드와 21개 라이선스 고지 검사를 통과했다. 기존 설치 앱을 ZIP으로 보존한 뒤 같은 설치 경로에 한 번 적용했다. 빌드·설치 번들의 56개 파일 일치 및 적용 전후 서버·탭 상태 파일 무변경을 확인했다. 별도 미리보기 앱은 실행하지 않았다.
+- 실제 설치 앱에서 기존 서버·탭과 배경 수집 실패 후 자동 인증 중지 안내를 확인했다. 이 시점에 서버 수집 타임아웃도 관찰했으며, 이 결과로 SSH 인증 성공을 주장하지 않는다. 새 도우미에 대한 실제 계정별 최초 ‘항상 허용’, ‘허용’·거부·잠긴 키체인의 시스템 UI 수락 및 이후 장시간 반복 요청 해소는 확인되지 않았다. 사용자가 OS 승인을 완료한 뒤 확인해야 한다.
+- 저장된 비밀번호 원문을 도구로 읽거나 출력하지 않았고 기존 키체인 항목을 삭제·수정하거나 접근 권한을 넓히지 않았다. Developer ID·공증·CI 및 Intel 실기기 검증은 포함하지 않는다. 기존 Keychain 호환을 위한 폐기 예정 API와 SwiftPM native 빌드 모드의 경고는 남아 있다.

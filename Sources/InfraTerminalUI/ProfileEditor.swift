@@ -82,7 +82,7 @@ struct ProfileEditor: View {
                                         }.buttonStyle(.borderless)
                                     }
                                 }.font(.caption)
-                                Text("macOS 키체인에 보관하며 터미널과 모니터링에 함께 사용합니다.")
+                                Text("macOS 키체인에 보관하며 터미널과 모니터링에 함께 사용합니다. 처음 연결할 때 ‘luluTerminalKeychain’ 요청에서 ‘항상 허용’을 선택하면 자동 연결에 사용할 수 있습니다.")
                                     .font(.caption).foregroundStyle(appearance.colors.muted)
                             }
                         }.padding(.vertical, 4)

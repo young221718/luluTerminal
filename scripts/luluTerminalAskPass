@@ -1,3 +1,3 @@
 #!/bin/sh
-# Keep Keychain access in the app executable; no UI is initialized in this mode.
-exec "$(dirname "$0")/../MacOS/InfraTerminal" --ssh-askpass "$@"
+# A UI rebuild must not change the executable trusted to read SSH passwords.
+exec "$(dirname "$0")/luluTerminalKeychain" --ssh-askpass "$@"

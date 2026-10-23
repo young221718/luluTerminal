@@ -45,11 +45,11 @@ open 'dist/Infra Terminal.app'
 - 원격 세션이 없으면 자동으로 다시 만들지 않는다. 사용자가 **새 세션 만들기**를 선택해야 생성하며, 같은 세션이 이미 있으면 생성을 중단한다.
 - 탭 닫기·연결 해제는 로컬 연결만 닫는다. 종료된 터미널 화면은 내부 표면·스크롤 기록을 해제하며 열린 다른 탭과 재연결한 화면은 유지한다. 원격 tmux 작업은 유지한다. 서버 재부팅이나 원격 프로세스 종료 후에는 작업 복원을 보장하지 않는다.
 - 모니터링은 SSH 키 또는 저장한 비밀번호 인증과 Linux `/proc`, `df`를 사용한다. NVIDIA GPU는 선택적으로 `nvidia-smi`의 UUID·index와 사용률·VRAM을 읽는다. Linux 디스크는 pseudo 파일시스템을 제외한 마운트를 개별 수집하고 합산하지 않는다. 목표 주기는 선택 서버 기본 2초(설정에서 2·5·10초), 나머지 10초이며 동시 수집 상한은 3대다. 오른쪽 사용량 막대·GPU 동심원과 주요 수치는 측정값 변경 시 수집 목표 간격의 90%(기본 1.8초) 동안 선형 보간하며, 숫자도 중간값을 거쳐 함께 변화한다. macOS 동작 줄이기 설정을 따른다. 느린 응답에서는 실제 주기가 길어질 수 있다. 저장한 비밀번호로 SSH 연결 확인이 실패하면 해당 계정의 자동 시도를 멈추고 명시적인 재시도 또는 자격 증명 수정 후 다시 시작한다.
-- 지표 이력은 앱 실행 중 최근 15분만 표시한다. 앱을 다시 실행하거나 긴 공백이 생기면 이력을 이어 붙이지 않는다. Ansible은 비활성 예정 메뉴다.
+- 지표 이력은 앱 실행 중 최근 15분만 표시한다. 앱을 다시 실행하거나 긴 공백이 생기면 이력을 이어 붙이지 않는다. Ansible 개발은 취소됐으며 현재 남아 있는 비활성 메뉴에는 실행 기능이 없다.
 
 상태 파일은 `~/Library/Application Support/InfraTerminal/workspace-v1.json`에 저장한다. 연결 종류가 없는 기존 v1 프로필은 SSH로, 인증 방식이 없는 계정은 기존 SSH 키·설정 방식으로 읽는다. 비밀번호 원문은 상태 JSON에 넣지 않는다. 손상 파일을 기본값으로 덮어쓰지 않으며 오류와 복구 경로를 표시한다. 기존 SSH 탭이 사용하는 계정 이름은 변경할 수 없으므로 다른 사용자는 새 계정으로 추가한다.
 
-동작 계약은 [SPEC](docs/SPEC.md), 모듈 경계는 [INTERFACES](docs/INTERFACES.md), 검사 책임과 실행법은 [TESTING](docs/TESTING.md), 실제 결과는 [VERIFICATION](docs/VERIFICATION.md)에 기록했다. [Ansible 연동 설계안](docs/ANSIBLE_DESIGN.md)은 기존 프로젝트·전용 실행 터미널 중심의 검토용 제안이며 아직 구현되지 않았다. 엔진 출처·라이선스는 [THIRD_PARTY](docs/THIRD_PARTY.md)를 따른다.
+동작 계약은 [SPEC](docs/SPEC.md), 모듈 경계는 [INTERFACES](docs/INTERFACES.md), 검사 책임과 실행법은 [TESTING](docs/TESTING.md), 실제 결과는 [VERIFICATION](docs/VERIFICATION.md)에 기록했다. [이전 Ansible 설계안](docs/ANSIBLE_DESIGN.md)은 2026-10-23 개발 취소 결정에 따라 이력으로만 보존한다. 현재 제품은 터미널·서버 연결·자원 모니터링에 집중한다. 엔진 출처·라이선스는 [THIRD_PARTY](docs/THIRD_PARTY.md)를 따른다.
 한국어 IME 조합 입력, VoiceOver, 네트워크 장애·장시간 수집은 추가 수락 검증 대상이다. 빌드한 앱은 ad-hoc 서명이며 Developer ID 서명·공증·자동 업데이트를 제공하지 않는다. 저장 데이터와 기존 앱 호환성을 위해 내부 실행파일·bundle 식별자·빌드 결과 경로는 InfraTerminal 이름을 유지한다.
 
 ## 보안과 라이선스

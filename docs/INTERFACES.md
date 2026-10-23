@@ -36,4 +36,4 @@ managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 �
 
 ## 검사·예정 인터페이스
 
-현재 API는 [TESTING](TESTING.md)의 자동 검사와 [VERIFICATION](VERIFICATION.md)의 수락 범위를 따른다. [Ansible 설계](ANSIBLE_DESIGN.md)의 JobPlan·supervisor·event adapter는 아직 코드에 없는 제안이다. 이번 정리로 public API를 변경하지 않았다.
+현재 API는 [TESTING](TESTING.md)의 자동 검사와 [VERIFICATION](VERIFICATION.md)의 수락 범위를 따른다. [Ansible 설계](ANSIBLE_DESIGN.md)의 JobPlan·supervisor·event adapter는 코드에 없는 제안이며 2026-10-23 사용자 결정으로 개발을 취소했다. 이번 정리로 public API를 변경하지 않았다.

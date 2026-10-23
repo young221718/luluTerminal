@@ -34,9 +34,10 @@ extension WorkspaceState {
     public mutating func ensureLocalMachine() {
         let wasEmpty = servers.isEmpty && tabs.isEmpty && selectedServerID == nil
         if let index = servers.firstIndex(where: { $0.id == LocalMachine.serverID }) {
-            servers.remove(at: index)
+            servers[index] = LocalMachine.profile
+        } else {
+            servers.insert(LocalMachine.profile, at: 0)
         }
-        servers.insert(LocalMachine.profile, at: 0)
         if !tabs.contains(where: { $0.serverID == LocalMachine.serverID }) {
             let id = tabs.contains(where: { $0.id == LocalMachine.initialTabID }) ? UUID() : LocalMachine.initialTabID
             let tab = TerminalTab(id: id, serverID: LocalMachine.serverID, accountID: LocalMachine.accountID, title: "셸")

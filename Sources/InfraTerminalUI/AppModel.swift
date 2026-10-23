@@ -90,6 +90,23 @@ public final class AppModel: ObservableObject {
         workspace.servers.first { $0.id == tab.serverID }?.accounts.first { $0.id == tab.accountID }
     }
     func selectServer(_ id: UUID) { workspace.select(serverID: id); persist() }
+    @discardableResult
+    func moveServer(_ id: UUID, relativeTo targetID: UUID, after: Bool) throws -> Bool {
+        guard !persistenceBlocked else { throw UIError.message(persistenceError ?? "저장 파일 복구 전에는 순서를 변경할 수 없습니다.") }
+        guard id != targetID, let source = workspace.servers.firstIndex(where: { $0.id == id }),
+              workspace.servers.contains(where: { $0.id == targetID }) else { return false }
+        var candidate = workspace
+        let server = candidate.servers.remove(at: source)
+        let target = candidate.servers.firstIndex(where: { $0.id == targetID })!
+        candidate.servers.insert(server, at: target + (after ? 1 : 0))
+        guard candidate != workspace else { return false }
+        if !isDemo {
+            do { try store.save(candidate); persistenceError = nil }
+            catch { persistenceError = "저장 실패: \(error.localizedDescription)\n\(storeURL.path)"; throw error }
+        }
+        workspace = candidate
+        return true
+    }
     func selectTab(_ id: UUID) { workspace.select(tabID: id); persist() }
     func closeTab(_ id: UUID) { workspace.close(tabID: id); disconnected(id); persist() }
     func reopenTab(_ id: UUID) { workspace.reopen(tabID: id); persist() }

@@ -5,13 +5,13 @@ import Testing
 @testable import InfraTerminalUI
 
 @MainActor struct ProfileEditorTests {
-    @Test func passwordEntryHasAVisibleFullWidthClickTarget() async throws {
+    @Test func profileEditorHasNoPasswordStorageField() async throws {
         let domain = "ProfileEditorTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: domain))
         defer { defaults.removePersistentDomain(forName: domain) }
-        let account = SSHAccount(username: "fixture", authMethod: .password)
+        let account = SSHAccount(username: "fixture")
         let profile = ServerProfile(name: "Fixture", host: "fixture.invalid", accounts: [account])
-        let editor = ProfileEditor(profile: profile, lockedAccountIDs: []) { _, _ in }
+        let editor = ProfileEditor(profile: profile, lockedAccountIDs: []) { _ in }
             .environmentObject(AppearancePreferences(defaults: defaults))
         let host = NSHostingView(rootView: editor)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 600),
@@ -23,42 +23,12 @@ import Testing
             host.layoutSubtreeIfNeeded()
             await Task.yield()
         }
-        let field = try #require(descendants(of: host).compactMap { $0 as? NSSecureTextField }.first)
-        let bounds = field.convert(field.bounds, to: host)
-        #expect(field.isEnabled && field.isEditable)
-        #expect(bounds.minX <= 80, "The password row's left side must be an editable target, not an inert label")
-        #expect(bounds.width >= 400, "The input must span the account row")
-        #expect(field.isBezeled || field.isBordered, "The editable region must have a visible boundary")
+        let fields = descendants(of: host).compactMap { $0 as? NSTextField }
+        #expect(fields.filter { $0.isEditable }.count >= 3, "Server and account identity fields remain editable")
+        #expect(!fields.contains { $0 is NSSecureTextField }, "Password authentication is entered only in SSH's terminal prompt")
     }
 
     private func descendants(of view: NSView) -> [NSView] {
         view.subviews.flatMap { [$0] + descendants(of: $0) }
-    }
-}
-
-@MainActor struct PasswordInputWarningTests {
-    @Test func koreanSourceWarnsOnlyForTheFocusedAccount() {
-        #expect(PasswordInputWarning.message(password: "", isFocused: true, koreanInputSource: true) != nil)
-        #expect(PasswordInputWarning.message(password: "", isFocused: false, koreanInputSource: true) == nil)
-        #expect(PasswordInputWarning.message(password: "Ascii!123", isFocused: true, koreanInputSource: false) == nil)
-    }
-
-    @Test(arguments: ["한글", "한", "ㄱㅏ", "힣", "ꥠ", "ힰ", "ﾡ"])
-    func composedAndDecomposedHangulWarnEvenAfterLeavingTheField(_ password: String) {
-        #expect(PasswordInputWarning.message(password: password, isFocused: false, koreanInputSource: false) != nil)
-    }
-
-    @Test(arguments: ["", "Abc!@#$%^&*()_+-=123", "spaces are preserved", "é日本語🙂"])
-    func otherCharactersDoNotTriggerAHangulWarning(_ password: String) {
-        #expect(PasswordInputWarning.message(password: password, isFocused: true, koreanInputSource: false) == nil)
-    }
-
-    @Test func sourceLanguageAndASCIICapabilityDistinguishKoreanRomanMode() {
-        #expect(PasswordInputWarning.isKoreanInputSource(languages: ["ko"], isASCIICapable: false))
-        #expect(PasswordInputWarning.isKoreanInputSource(languages: ["ko-KR"], isASCIICapable: false))
-        #expect(!PasswordInputWarning.isKoreanInputSource(languages: ["ko"], isASCIICapable: true))
-        #expect(!PasswordInputWarning.isKoreanInputSource(languages: ["en"], isASCIICapable: true))
-        #expect(!PasswordInputWarning.isKoreanInputSource(languages: ["ja"], isASCIICapable: false))
-        #expect(!PasswordInputWarning.isKoreanInputSource(languages: [], isASCIICapable: false))
     }
 }

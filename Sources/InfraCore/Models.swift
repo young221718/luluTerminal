@@ -15,24 +15,35 @@ public enum CoreError: Error, LocalizedError, Equatable {
     }
 }
 
-public enum SSHAuthenticationMethod: String, Codable, Sendable { case system, password, managedKey }
+public enum SSHAuthenticationMethod: String, Codable, Sendable {
+    case system, managedKey
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.singleValueContainer()
+        let value = try values.decode(String.self)
+        // Saved-password accounts keep their identity and return to interactive system SSH.
+        if value == "password" { self = .system; return }
+        guard let method = Self(rawValue: value) else {
+            throw DecodingError.dataCorruptedError(in: values, debugDescription: "Unknown SSH authentication method: \(value)")
+        }
+        self = method
+    }
+}
 
 public struct SSHAccount: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var username: String
     public var authMethod: SSHAuthenticationMethod
-    public var credential: SSHPasswordReference?
     public var managedKey: SSHManagedKeyReference?
-    public init(id: UUID = UUID(), username: String, authMethod: SSHAuthenticationMethod = .system, credential: SSHPasswordReference? = nil, managedKey: SSHManagedKeyReference? = nil) {
-        self.id = id; self.username = username; self.authMethod = authMethod; self.credential = credential; self.managedKey = managedKey
+    public init(id: UUID = UUID(), username: String, authMethod: SSHAuthenticationMethod = .system, managedKey: SSHManagedKeyReference? = nil) {
+        self.id = id; self.username = username; self.authMethod = authMethod; self.managedKey = managedKey
     }
-    private enum CodingKeys: String, CodingKey { case id, username, authMethod, credential, managedKey }
+    private enum CodingKeys: String, CodingKey { case id, username, authMethod, managedKey }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         username = try values.decode(String.self, forKey: .username)
         authMethod = try values.decodeIfPresent(SSHAuthenticationMethod.self, forKey: .authMethod) ?? .system
-        credential = try values.decodeIfPresent(SSHPasswordReference.self, forKey: .credential)
         managedKey = try values.decodeIfPresent(SSHManagedKeyReference.self, forKey: .managedKey)
     }
 }

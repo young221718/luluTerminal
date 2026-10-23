@@ -31,14 +31,10 @@ public final class AppModel: ObservableObject {
     private let store: StateStore
     typealias CommandExecutor = @Sendable (ShellCommand, TimeInterval) async throws -> ProcessResult
     private let execute: CommandExecutor
-    private let credentialStore: any PasswordCredentialStore
-    private let helperPath: String?
     private let agentEnvironment: [String: String]
     private struct AccountKey: Hashable { let serverID: UUID; let accountID: UUID }
     private var pausedAuthentication: [AccountKey: SSHConnectionFailure] = [:]
     private var activeAuthentication: Set<AccountKey> = []
-    private var passwordTerminalAccounts: [UUID: AccountKey] = [:]
-    private var savingProfiles: Set<UUID> = []
     private var keySetupTokens: [AccountKey: UUID] = [:]
     private var verifyingKeySetups: Set<UUID> = []
     private var previous: [UUID: RawMetrics] = [:]
@@ -75,13 +71,9 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    init(demo: Bool, storeURL: URL?, credentialStore: any PasswordCredentialStore = KeychainCredentialStore(),
-         helperPath: String? = SSHPasswordAuthentication.helperPath,
-         agentEnvironment: [String: String] = ProcessInfo.processInfo.environment, execute: @escaping CommandExecutor) {
+    init(demo: Bool, storeURL: URL?, agentEnvironment: [String: String] = ProcessInfo.processInfo.environment, execute: @escaping CommandExecutor) {
         self.isDemo = demo
         self.execute = execute
-        self.credentialStore = credentialStore
-        self.helperPath = helperPath
         self.agentEnvironment = agentEnvironment
         self.storeURL = storeURL ?? Self.defaultStoreURL
         self.store = StateStore(url: self.storeURL)
@@ -137,18 +129,12 @@ public final class AppModel: ObservableObject {
     }
 
     private func invalidateConnection(_ id: UUID) {
-        passwordTerminalAccounts[id] = nil
         connectionTokens[id] = nil
         connectionChecks.removeValue(forKey: id)?.cancel()
         connections[id] = .disconnected
     }
 
     func terminalExited(_ id: UUID) {
-        if let key = passwordTerminalAccounts.removeValue(forKey: id),
-           workspace.servers.first(where: { $0.id == key.serverID })?.accounts.first(where: { $0.id == key.accountID })?.authMethod == .password {
-            pausedAuthentication[key] = .authentication
-            collectionErrors[key.serverID] = "SSH 연결 확인 필요. 다시 연결하거나 서버 메뉴에서 인증 설정을 확인하세요."
-        }
         // Only an observed sleep/network interruption carries reconnect intent through an exit.
         if interruptedConnections[id] != nil { invalidateConnection(id) }
         else { disconnected(id) }
@@ -190,72 +176,13 @@ public final class AppModel: ObservableObject {
 
     private func recoveryServer(for tab: TerminalTab) -> ServerProfile? {
         guard let server = workspace.servers.first(where: { $0.id == tab.serverID && $0.kind == .ssh }),
-              let account = server.accounts.first(where: { $0.id == tab.accountID }), account.authMethod != .password else { return nil }
+              server.accounts.contains(where: { $0.id == tab.accountID }) else { return nil }
         return server
     }
 
     func saveProfile(_ profile: ServerProfile) throws {
         try validateProfileEdit(profile)
-        for account in profile.accounts where account.authMethod == .password {
-            guard let reference = account.credential, reference.target.matches(server: profile, account: account) else {
-                throw UIError.message("연결 대상이 바뀌었습니다. 이 계정의 비밀번호를 다시 입력하세요.")
-            }
-        }
         try commitProfile(profile)
-    }
-
-    func saveProfile(_ draft: ServerProfile, passwords: [UUID: String]) async throws {
-        try validateProfileEdit(draft)
-        guard !savingProfiles.contains(draft.id) else { throw UIError.message("이 서버의 설정을 저장하는 중입니다.") }
-        if isDemo {
-            guard passwords.values.allSatisfy({ $0.isEmpty }), draft.accounts.allSatisfy({ $0.authMethod == .system && $0.credential == nil }) else {
-                throw UIError.message("데모에서는 비밀번호를 키체인에 저장하지 않습니다.")
-            }
-            try commitProfile(draft)
-            return
-        }
-        savingProfiles.insert(draft.id)
-        defer { savingProfiles.remove(draft.id) }
-        let original = workspace.servers.first { $0.id == draft.id }
-        var profile = draft
-        var created: [SSHPasswordReference] = []
-        do {
-            for index in profile.accounts.indices {
-                var account = profile.accounts[index]
-                if account.authMethod == .managedKey {
-                    guard let reference = account.managedKey else { throw UIError.message("서버를 저장한 뒤 SSH 키 설정을 완료하세요.") }
-                    try SSHManagedKeys.validate(reference: reference, server: profile, account: account)
-                } else if account.authMethod == .password, let password = passwords[account.id], !password.isEmpty {
-                    let target = try await SSHPasswordAuthentication.resolveTarget(server: profile, account: account, execute: execute)
-                    let reference = SSHPasswordReference(target: target)
-                    // A new reference keeps the old secret intact until the state file commits.
-                    try credentialStore.save(password, reference: reference)
-                    created.append(reference)
-                    account.credential = reference
-                } else if account.authMethod == .password {
-                    guard let reference = account.credential, reference.target.matches(server: profile, account: account) else {
-                        throw UIError.message("이 연결 대상의 비밀번호를 입력하세요.")
-                    }
-                }
-                profile.accounts[index] = account
-            }
-            guard workspace.servers.first(where: { $0.id == draft.id }) == original else {
-                throw UIError.message("저장 중 서버 설정이 변경되었습니다. 다시 확인하세요.")
-            }
-            try validateProfileEdit(profile)
-            try commitProfile(profile)
-        } catch {
-            for reference in created {
-                do { try credentialStore.delete(reference: reference) }
-                catch { persistenceError = "저장 실패 후 새 키체인 항목 정리에 실패했습니다. 키체인 접근에서 luluTerminal 항목을 확인하세요." }
-            }
-            throw error
-        }
-        let retained = Set(profile.accounts.compactMap { $0.credential?.id })
-        for reference in original?.accounts.compactMap(\.credential) ?? [] where !retained.contains(reference.id) {
-            do { try credentialStore.delete(reference: reference) }
-            catch { persistenceError = "설정은 저장했지만 이전 비밀번호를 키체인에서 삭제하지 못했습니다. 키체인 접근에서 luluTerminal 항목을 확인하세요." }
-        }
     }
 
     private func validateProfileEdit(_ profile: ServerProfile) throws {
@@ -284,7 +211,7 @@ public final class AppModel: ObservableObject {
             throw UIError.message("저장된 SSH 서버와 계정을 선택하세요. 데모에서는 키를 설정하지 않습니다.")
         }
         let key = AccountKey(serverID: serverID, accountID: accountID)
-        guard keySetupTokens[key] == nil, !savingProfiles.contains(serverID), !activeAuthentication.contains(key) else {
+        guard keySetupTokens[key] == nil, !activeAuthentication.contains(key) else {
             throw UIError.message("이 계정의 인증 작업이 진행 중입니다. 완료 후 다시 시도하세요.")
         }
         let token = UUID()
@@ -292,7 +219,7 @@ public final class AppModel: ObservableObject {
         activeAuthentication.insert(key)
         do {
             let socket = try await availableSSHAgent()
-            let target = try await SSHPasswordAuthentication.resolveTarget(server: server, account: account, execute: execute)
+            let target = try await SSHConnectionResolver.resolveTarget(server: server, account: account, execute: execute)
             try requireCurrentKeySetup(token, server: server, account: account)
             let reference: SSHManagedKeyReference
             let command: ShellCommand
@@ -325,7 +252,7 @@ public final class AppModel: ObservableObject {
         guard !verifyingKeySetups.contains(setup.id) else { throw UIError.message("SSH 키를 검증하고 있습니다.") }
         verifyingKeySetups.insert(setup.id)
         defer { verifyingKeySetups.remove(setup.id) }
-        let target = try await SSHPasswordAuthentication.resolveTarget(server: setup.server, account: setup.account, execute: execute)
+        let target = try await SSHConnectionResolver.resolveTarget(server: setup.server, account: setup.account, execute: execute)
         try requireCurrentKeySetup(setup.id, server: setup.server, account: setup.account)
         guard target == setup.reference.target else { throw UIError.message("SSH 별칭의 연결 대상이 바뀌었습니다. 설정을 닫고 다시 시작하세요.") }
         _ = try await availableSSHAgent(socket: setup.agentSocket)
@@ -341,7 +268,7 @@ public final class AppModel: ObservableObject {
         guard let index = profile.accounts.firstIndex(where: { $0.id == setup.account.id }) else { return }
         profile.accounts[index].managedKey = setup.reference
         profile.accounts[index].authMethod = .managedKey
-        // Keep the prior credential dormant and existing terminal surfaces connected.
+        // Keep existing terminal surfaces connected while the verified key becomes active.
         try commitProfile(profile, disconnectTabs: false)
         cancelSSHKeySetup(setup.id)
         pausedAuthentication[AccountKey(serverID: profile.id, accountID: setup.account.id)] = nil
@@ -375,10 +302,11 @@ public final class AppModel: ObservableObject {
         return socket
     }
 
-    private func managedKeySocket(server: ServerProfile, account: SSHAccount) async throws -> String {
+    private func managedKeySocket(server: ServerProfile, account: SSHAccount, isCurrent: () -> Bool = { true }) async throws -> String {
         guard let reference = account.managedKey else { throw UIError.message("SSH 키 설정을 완료하세요.") }
         try SSHManagedKeys.validate(reference: reference, server: server, account: account)
-        let target = try await SSHPasswordAuthentication.resolveTarget(server: server, account: account, execute: execute)
+        let target = try await SSHConnectionResolver.resolveTarget(server: server, account: account, execute: execute)
+        guard !Task.isCancelled, workspace.servers.contains(server), isCurrent() else { throw CancellationError() }
         guard target == reference.target else { throw UIError.message("SSH 별칭의 연결 대상이 바뀌었습니다. SSH 키 설정을 다시 진행하세요.") }
         return try await availableSSHAgent()
     }
@@ -456,9 +384,8 @@ public final class AppModel: ObservableObject {
         } else { interruptedConnections[tabID] = nil }
         guard connections[tabID] != .checking else { return nil }
         let key = AccountKey(serverID: server.id, accountID: account.id)
-        let savedPassword = server.kind == .ssh && account.authMethod == .password && !manualAuthentication
         let managedKey = server.kind == .ssh && account.authMethod == .managedKey
-        let protectedAuthentication = savedPassword || managedKey
+        let protectedAuthentication = managedKey
         let token = UUID()
         var ownsAuthentication = false
         let previousConnectionState = connections[tabID]
@@ -482,7 +409,7 @@ public final class AppModel: ObservableObject {
             if automaticRecovery && account.authMethod == .system {
                 do {
                     // Detect unsupported routes without replacing them with a direct connection.
-                    _ = try await SSHPasswordAuthentication.resolveTarget(server: server, account: account, execute: execute)
+                    _ = try await SSHConnectionResolver.resolveTarget(server: server, account: account, execute: execute)
                 } catch {
                     guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
                     interruptedConnections[tabID] = nil
@@ -491,7 +418,7 @@ public final class AppModel: ObservableObject {
                 }
                 guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
             }
-            if account.authMethod == .password || managedKey {
+            if managedKey {
                 if let poll = polls[server.id] { await poll.value }
                 guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
                 if retryAuthentication { pausedAuthentication[key] = nil; collectionErrors[server.id] = nil }
@@ -508,18 +435,13 @@ public final class AppModel: ObservableObject {
                     ownsAuthentication = true
                 }
             }
-            let authentication: SSHAuthenticationContext?
-            if savedPassword {
-                guard let helperPath else { throw UIError.message("비밀번호 연결 도우미가 없습니다. 앱을 다시 설치하세요.") }
-                authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, allowsKeychainInteraction: !automaticRecovery, execute: execute)
-            } else { authentication = nil }
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
                   workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
-            let managedSocket = managedKey ? try await managedKeySocket(server: server, account: account) : nil
+            let managedSocket = managedKey ? try await managedKeySocket(server: server, account: account, isCurrent: { self.connectionTokens[tabID] == token }) : nil
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
             // Explicit creation authenticates first; exit 44 means the requested session is absent.
-            if (!create && probeExisting) || protectedAuthentication {
-                var probe = try SSHCommandBuilder.probe(server: server, account: account, tab: tab, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedSocket)
+            if (!create && probeExisting && !manualAuthentication) || protectedAuthentication {
+                var probe = try SSHCommandBuilder.probe(server: server, account: account, tab: tab, managedKeyAgentSocket: managedSocket)
                 if automaticRecovery { probe = unattendedRecoveryCommand(probe) }
                 let execute = self.execute
                 let check = Task { try await execute(probe, 8) }
@@ -541,17 +463,11 @@ public final class AppModel: ObservableObject {
             }
             guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server),
                   workspace.tabs.contains(where: { $0.id == tabID && !$0.isClosed }) else { return nil }
-            // Probe and terminal use separate SSH processes. Allow Once for the probe
-            // must not leave the explicit terminal request unable to ask for access.
             var command = try SSHCommandBuilder.terminal(server: server, account: account, tab: tab, create: create,
-                                                        authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedSocket)
+                                                        managedKeyAgentSocket: managedSocket)
             if automaticRecovery { command = unattendedRecoveryCommand(command) }
             interruptedConnections[tabID] = nil
             pausedAuthentication[key] = nil
-            if savedPassword {
-                passwordTerminalAccounts[tab.id] = key
-                lastAttempts[server.id] = Date().addingTimeInterval(10)
-            } else { passwordTerminalAccounts[tab.id] = nil }
             connections[tabID] = .launched
             return command
         } catch {
@@ -566,17 +482,13 @@ public final class AppModel: ObservableObject {
 
     private func connectionState(for failure: SSHConnectionFailure) -> ConnectionState {
         switch failure {
-        case .authentication, .keychainAccess: return .authenticationRequired(failure.localizedDescription)
+        case .authentication: return .authenticationRequired(failure.localizedDescription)
         default: return .failed(failure.localizedDescription)
         }
     }
 
     private func connectionFailure(for error: Error) -> SSHConnectionFailure {
         if let failure = error as? SSHConnectionFailure { return failure }
-        if let passwordError = error as? SSHPasswordError {
-            if case .keychainAccessRequired = passwordError { return .keychainAccess }
-            return .authentication
-        }
         if let processError = error as? ProcessRunnerError, processError == .timedOut { return .network }
         return .unknown
     }
@@ -588,7 +500,7 @@ public final class AppModel: ObservableObject {
                              "-o", "PasswordAuthentication=no", "-o", "KbdInteractiveAuthentication=no",
                              "-o", "UseKeychain=no", "-o", "AddKeysToAgent=no", "-o", "PermitLocalCommand=no",
                              "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no"] + command.arguments
-        command.environment.merge(["SSH_ASKPASS_REQUIRE": "never", "SSH_ASKPASS": "", "LULUTERMINAL_SSH_REFERENCE": "", "LULUTERMINAL_KEYCHAIN_UI": "fail", "LC_ALL": "C"]) { _, value in value }
+        command.environment.merge(["SSH_ASKPASS_REQUIRE": "never", "SSH_ASKPASS": "", "LC_ALL": "C"]) { _, value in value }
         return command
     }
 
@@ -649,15 +561,14 @@ public final class AppModel: ObservableObject {
     private func isAuthenticationUnavailable(server: ServerProfile) -> Bool {
         guard let account = server.accounts.first(where: { $0.id == server.monitorAccountID }) else { return false }
         let key = AccountKey(serverID: server.id, accountID: account.id)
-        return pausedAuthentication[key] != nil || activeAuthentication.contains(key) || savingProfiles.contains(server.id)
+        return pausedAuthentication[key] != nil || activeAuthentication.contains(key)
     }
 
     private func poll(_ id: UUID, at time: Date) {
         guard let server = workspace.servers.first(where: { $0.id == id }), let account = server.accounts.first(where: { $0.id == server.monitorAccountID }) else { return }
         let key = AccountKey(serverID: server.id, accountID: account.id)
-        let savedPassword = account.authMethod == .password
         let managedKey = account.authMethod == .managedKey
-        let protectedAuthentication = savedPassword || managedKey
+        let protectedAuthentication = managedKey
         guard !protectedAuthentication || !isAuthenticationUnavailable(server: server) else { return }
         if protectedAuthentication { activeAuthentication.insert(key) }
         lastAttempts[id] = time
@@ -669,14 +580,9 @@ public final class AppModel: ObservableObject {
             }
             var receivedResult = false
             do {
-                let authentication: SSHAuthenticationContext?
-                if savedPassword {
-                    guard let helperPath = self.helperPath else { throw UIError.message("비밀번호 연결 도우미가 없습니다. 앱을 다시 설치하세요.") }
-                    authentication = try await SSHPasswordAuthentication.context(server: server, account: account, helperPath: helperPath, execute: self.execute)
-                } else { authentication = nil }
                 let managedSocket = managedKey ? try await self.managedKeySocket(server: server, account: account) : nil
                 guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
-                let result = try await self.execute(SSHCommandBuilder.monitor(server: server, account: account, authentication: authentication, managedKeyAgentSocket: managedSocket), 8)
+                let result = try await self.execute(SSHCommandBuilder.monitor(server: server, account: account, managedKeyAgentSocket: managedSocket), 8)
                 receivedResult = true
                 guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
                 guard result.exitCode == 0 else {

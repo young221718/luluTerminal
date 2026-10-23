@@ -6,26 +6,25 @@
 
 | 책임 | 구현 | 경계 |
 | --- | --- | --- |
-| 프로필·계정·탭·상태 | [Models.swift](../Sources/InfraCore/Models.swift) | UUID identity, 버전 있는 Codable 상태, 누락된 kind/auth 기본값, 원자적 저장·손상 보존 |
+| 프로필·계정·탭·상태 | [Models.swift](../Sources/InfraCore/Models.swift) | UUID identity, system/managedKey 인증, 버전 있는 Codable 상태, 누락된 kind/auth 기본값, legacy password→system 변환·credential 메타데이터 무시, 원자적 저장·손상 보존 |
 | 셸·SSH/tmux 명령 | [SSHCommands.swift](../Sources/InfraCore/SSHCommands.swift) | ShellCommand는 executable/arguments/standardInput/environment. shellString은 모든 인자를 인용한다. cwd나 streaming 이벤트 필드는 없다. |
 | 단기 실행 | [ProcessRunner.swift](../Sources/InfraCore/ProcessRunner.swift) | run 결과는 exitCode/stdout/stderr. 기본 timeout 8초, 합계 출력 1 MiB. 취소·timeout·출력 초과 때 프로세스 그룹 종료·직접 자식 회수. 장시간 작업 API로 사용하지 않는다. |
-| 저장 비밀번호 | [SSHPasswordAuthentication.swift](../Sources/InfraCore/SSHPasswordAuthentication.swift), [KeychainCredentialStore.swift](../Sources/InfraCore/KeychainCredentialStore.swift) | resolveTarget/context가 해석된 대상과 참조를 검증. PasswordCredentialStore는 테스트 주입 경계. 비밀 원문은 JSON·argv·환경에 넣지 않는다. |
 | 앱 생성 키 | [SSHManagedKeys.swift](../Sources/InfraCore/SSHManagedKeys.swift) | 참조·키 경로·setup/unlock/verification 명령. 입력/해석된 대상 바인딩과 검증된 agent socket 사용. 암호는 native 터미널에서만 입력. |
-| 연결 실패 | [SSHConnectionFailure.swift](../Sources/InfraCore/SSHConnectionFailure.swift) | SSH 255를 network/authentication/keychainAccess/hostKey/unknown으로 분류. network 외 실패는 자동 재시도를 막으며 네트워크 오류를 키 잠금 해제로 오인하지 않는다. |
+| 연결 실패 | [SSHConnectionFailure.swift](../Sources/InfraCore/SSHConnectionFailure.swift) | SSH 255를 network/authentication/hostKey/unknown으로 분류. network 외 실패는 자동 재시도를 막으며 네트워크 오류를 키 잠금 해제로 오인하지 않는다. |
 | 측정값 | [Metrics.swift](../Sources/InfraCore/Metrics.swift) | 비율은 0…1 Double?, nil은 unknown. 개별 DiskReading/GPUReading/NetworkRate와 기존 요약을 구분. Parser와 Calculator는 수집·화면에서 분리. |
 | 현재 Mac | [LocalMachine.swift](../Sources/InfraCore/LocalMachine.swift) | 예약 UUID, 기존 순서를 보존하는 ensureLocalMachine, 로컬 셸·CPU/RAM/마운트 수집. SSH builder는 local 거부. |
 
-SSHCommandBuilder의 terminal/probe/monitor는 optional authentication, manualAuthentication, managedKeyAgentSocket 및 테스트용 managedKeyRootURL을 받는다. 자동 복구는 해석된 SSH 설정을 먼저 확인하고 ProxyJump·ProxyCommand·HostKeyAlias 연결을 수동 재시도로 남긴다. 비대화형 복구를 위해 기존 SSH 경로·포워딩을 제거하지 않는다.
+SSHCommandBuilder의 terminal/probe/monitor는 managedKeyAgentSocket 및 테스트용 managedKeyRootURL을 받는다. 모든 SSH 명령은 UseKeychain=no, AddKeysToAgent=no와 SSH_ASKPASS_REQUIRE=never를 적용한다. system 터미널은 대화형 인증을 허용하고 사전 확인·모니터링은 비대화형 키·agent 인증만 허용한다. 자동 복구는 해석된 SSH 설정을 먼저 확인하고 ProxyJump·ProxyCommand·HostKeyAlias 연결을 수동 재시도로 남긴다. 비대화형 복구를 위해 기존 SSH 경로·포워딩을 제거하지 않는다.
 
-Keychain context의 allowsKeychainInteraction 기본값은 false다. 비밀 없는 정책 LULUTERMINAL_KEYCHAIN_UI=allow|fail을 독립 도우미에 전달한다. 명시 연결의 probe와 terminal만 true, 모니터링은 false다. keychainAccessRequired와 비밀 없는 stderr marker로 일반 인증 실패를 구분한다. 도우미는 자신의 프로세스에서만 UI 정책을 적용하고 종료한다.
+앱에는 비밀번호 저장소·Keychain context·인증 도우미·askpass 인터페이스가 없다. 과거 password 프로필의 credential 필드는 디코딩 때 읽지 않으며 새 상태에 인코딩하지 않는다. 이 변환은 계정·탭 identity를 보존하며 과거 키체인 항목 삭제를 증명하지 않는다.
 
 ## InfraTerminalUI
 
-[AppModel.swift](../Sources/InfraTerminalUI/AppModel.swift)는 MainActor에서 프로필·탭·저장·인증·수집을 조정한다. 실행기·credential store·상태 URL은 테스트에서 주입한다. 잘못되거나 오래된 async 결과가 최신 프로필과 세션을 바꾸지 않도록 대상과 token을 재검증한다.
+[AppModel.swift](../Sources/InfraTerminalUI/AppModel.swift)는 MainActor에서 프로필·탭·저장·인증·수집을 조정한다. 실행기·상태 URL은 테스트에서 주입한다. 잘못되거나 오래된 async 결과가 최신 프로필과 세션을 바꾸지 않도록 대상과 token을 재검증한다.
 
-managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 모두 성공해야 한다. 설정 터미널 종료 자체는 성공 신호가 아니다. 기존 password 참조는 휴면 상태로 보존하고 managedKey 경로에서 읽지 않는다.
+managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 모두 성공해야 한다. 설정 터미널 종료 자체는 성공 신호가 아니다. 최초 서버 인증과 키 암호는 설정 터미널에 직접 입력하며 앱 모델이 받거나 저장하지 않는다. 암호 있는 키는 로그인 세션 agent에서 잠금을 해제한다.
 
-연결 복구의 모델 경계는 configureConnectionRecovery(enabled:), connectionEnvironmentInterrupted(), beginConnectionRecovery()와 prepareConnection(... automaticRecovery:)다. 중단 전 연결 의도·탭·계정·프로필·token을 재확인하며 복구 허가는 한 번만 사용한다. 저장 비밀번호·닫힌 탭·로컬·데모를 제외하고 기존 세션만 확인한다. 수동 해제·닫기·프로필 변경·설정 해제 뒤 오래된 결과를 버린다. 자동 복구는 Keychain UI·askpass·대화형 인증을 허용하지 않는다.
+연결 복구의 모델 경계는 configureConnectionRecovery(enabled:), connectionEnvironmentInterrupted(), beginConnectionRecovery()와 prepareConnection(... automaticRecovery:)다. 중단 전 연결 의도·탭·계정·프로필·token을 재확인하며 복구 허가는 한 번만 사용한다. 닫힌 탭·로컬·데모를 제외하고 기존 세션만 확인한다. 수동 해제·닫기·프로필 변경·설정 해제 뒤 오래된 결과를 버린다. 자동 복구는 대화형 인증과 키 잠금 해제를 허용하지 않는다.
 
 | 책임 | 구현 | 경계 |
 | --- | --- | --- |

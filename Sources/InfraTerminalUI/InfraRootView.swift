@@ -120,8 +120,8 @@ public struct InfraRootView: View {
             }
         }
         .sheet(isPresented: $showProfile) {
-            ProfileEditor(profile: editingProfile, lockedAccountIDs: Set(model.workspace.tabs.filter { $0.serverID == editingProfile?.id }.map(\.accountID)), demo: model.isDemo) { profile, passwords in
-                try await model.saveProfile(profile, passwords: passwords)
+            ProfileEditor(profile: editingProfile, lockedAccountIDs: Set(model.workspace.tabs.filter { $0.serverID == editingProfile?.id }.map(\.accountID)), demo: model.isDemo) { profile in
+                try model.saveProfile(profile)
                 for tab in model.workspace.tabs where tab.serverID == profile.id { terminal.disconnect(id: tab.id) }
             }
             .id(editingProfile?.id)
@@ -398,9 +398,6 @@ public struct InfraRootView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label(error, systemImage: "key").textSelection(.enabled)
                         HStack {
-                            if model.account(for: tab)?.authMethod == .password {
-                                Button("비밀번호 재시도") { connect(tab, create: false, retryAuthentication: true) }
-                            }
                             if model.account(for: tab)?.authMethod == .managedKey {
                                 Button("SSH 키 잠금 해제") { keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: tab.accountID, unlock: true) }
                             } else {

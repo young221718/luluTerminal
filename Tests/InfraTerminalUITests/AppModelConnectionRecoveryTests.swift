@@ -110,7 +110,7 @@ extension AppModelTests {
         #expect(model.connections[second.id] == .launched)
     }
 
-    @Test func testRecoveryExcludesPasswordLocalClosedManualAndNeverOpenedTabs() async throws {
+    @Test func testRecoveryExcludesLocalClosedManualAndNeverOpenedTabs() async throws {
         let recorder = RecoveryCommandRecorder()
         let (model, profile, opened) = try recoveryFixture(recorder: recorder)
         #expect(await model.prepareConnection(tabID: opened.id, create: false) != nil)
@@ -131,14 +131,6 @@ extension AppModelTests {
         }
         #expect(await recorder.commands.count == count)
 
-        let (passwordModel, _, passwordTab) = try recoveryFixture(recorder: recorder, method: .password)
-        #expect(await passwordModel.prepareConnection(tabID: passwordTab.id, create: false) != nil)
-        passwordModel.configureConnectionRecovery(enabled: true)
-        passwordModel.connectionEnvironmentInterrupted()
-        let passwordCount = await recorder.commands.count
-        #expect(passwordModel.beginConnectionRecovery().isEmpty)
-        #expect(await passwordModel.prepareConnection(tabID: passwordTab.id, create: false, automaticRecovery: true) == nil)
-        #expect(await recorder.commands.count == passwordCount, "Password exclusion must happen before any target resolution or Keychain helper command")
         let demo = AppModel(demo: true, storeURL: temporaryURL()) { command, _ in await recorder.run(command) }
         demo.configureConnectionRecovery(enabled: true)
         demo.connectionEnvironmentInterrupted()
@@ -217,12 +209,11 @@ extension AppModelTests {
     }
 
     private func recoveryFixture(recorder: RecoveryCommandRecorder, method: SSHAuthenticationMethod = .system) throws -> (AppModel, ServerProfile, TerminalTab) {
-        let model = AppModel(demo: false, storeURL: temporaryURL(), helperPath: "/usr/bin/true", agentEnvironment: ["SSH_AUTH_SOCK": "/tmp/fixture-agent"]) { command, _ in await recorder.run(command) }
+        let model = AppModel(demo: false, storeURL: temporaryURL(), agentEnvironment: ["SSH_AUTH_SOCK": "/tmp/fixture-agent"]) { command, _ in await recorder.run(command) }
         var profile = server()
         profile.accounts[0].authMethod = method
-        let target = SSHPasswordTarget(server: profile, account: profile.accounts[0], resolvedHost: "example.invalid")
+        let target = SSHConnectionTarget(server: profile, account: profile.accounts[0], resolvedHost: "example.invalid")
         if method == .managedKey { profile.accounts[0].managedKey = SSHManagedKeyReference(target: target) }
-        if method == .password { profile.accounts[0].credential = SSHPasswordReference(target: target) }
         try model.saveProfile(profile)
         let tab = try model.addTab(serverID: profile.id, accountID: profile.accounts[0].id, title: "Recovery")
         return (model, profile, tab)

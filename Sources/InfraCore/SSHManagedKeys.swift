@@ -2,8 +2,8 @@ import Foundation
 
 public struct SSHManagedKeyReference: Codable, Equatable, Sendable {
     public var id: UUID
-    public var target: SSHPasswordTarget
-    public init(id: UUID = UUID(), target: SSHPasswordTarget) { self.id = id; self.target = target }
+    public var target: SSHConnectionTarget
+    public init(id: UUID = UUID(), target: SSHConnectionTarget) { self.id = id; self.target = target }
 }
 
 public enum SSHManagedKeys {
@@ -23,7 +23,7 @@ public enum SSHManagedKeys {
 
     private static func validate(reference: SSHManagedKeyReference) throws {
         let target = reference.target
-        guard SSHPasswordAuthentication.validHost(target.host), SSHPasswordAuthentication.validHost(target.resolvedHost),
+        guard SSHConnectionResolver.validHost(target.host), SSHConnectionResolver.validHost(target.resolvedHost),
               (1...65535).contains(target.port),
               let range = target.username.range(of: "^[A-Za-z0-9_][A-Za-z0-9_.-]*[$]?$", options: .regularExpression),
               range == target.username.startIndex..<target.username.endIndex else {
@@ -35,7 +35,7 @@ public enum SSHManagedKeys {
         guard agentSocket.hasPrefix("/"), !agentSocket.contains(where: { $0 == "\0" || $0 == "\n" || $0 == "\r" }) else {
             throw CoreError.invalidProfile("SSH 에이전트가 없습니다. macOS 로그인 세션에서 다시 시도하세요.")
         }
-        return ["SSH_AUTH_SOCK": agentSocket, "SSH_ASKPASS_REQUIRE": "never", "APPLE_SSH_ADD_BEHAVIOR": "openssh", "LULUTERMINAL_SSH_REFERENCE": ""]
+        return ["SSH_AUTH_SOCK": agentSocket, "SSH_ASKPASS_REQUIRE": "never", "APPLE_SSH_ADD_BEHAVIOR": "openssh", "SSH_ASKPASS": ""]
     }
 
     static func connectionArguments(reference: SSHManagedKeyReference, interactive: Bool, rootURL: URL? = nil) -> [String] {

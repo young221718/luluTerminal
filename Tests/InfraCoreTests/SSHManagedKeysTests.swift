@@ -6,7 +6,7 @@ struct SSHManagedKeysTests {
     private func fixture() -> (ServerProfile, SSHAccount, SSHManagedKeyReference) {
         var account = SSHAccount(username: "trainer", authMethod: .managedKey)
         var server = ServerProfile(name: "GPU", host: "gpu-alias", accounts: [account])
-        let reference = SSHManagedKeyReference(id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!, target: SSHPasswordTarget(server: server, account: account, resolvedHost: "192.0.2.5"))
+        let reference = SSHManagedKeyReference(id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!, target: SSHConnectionTarget(server: server, account: account, resolvedHost: "192.0.2.5"))
         account.managedKey = reference; server.accounts = [account]
         return (server, account, reference)
     }
@@ -36,10 +36,12 @@ struct SSHManagedKeysTests {
         ]
         for command in commands {
             #expect(command.environment["SSH_ASKPASS_REQUIRE"] == "never")
+            #expect(command.environment["SSH_ASKPASS"] == "")
             #expect(command.environment["SSH_AUTH_SOCK"] == "/private/tmp/fixture.sock")
             #expect(command.arguments.contains("/dev/null"))
             #expect(command.arguments.contains(key.path))
             #expect(command.arguments.contains("UseKeychain=no"))
+            #expect(command.arguments.contains("AddKeysToAgent=no"))
             let result = try await ProcessRunner().run(ShellCommand(executable: "/usr/bin/ssh", arguments: ["-G"] + command.arguments.dropLast()))
             #expect(result.exitCode == 0)
             let lines = result.stdout.split(separator: "\n").map(String.init)

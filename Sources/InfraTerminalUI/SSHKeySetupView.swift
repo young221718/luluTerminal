@@ -31,7 +31,7 @@ struct SSHKeySetupView: View {
             }
             Text(request.unlock
                  ? "아래 터미널의 ssh-add 요청에 키 암호를 입력하세요. 키를 다시 생성하거나 서버에 다시 등록하지 않습니다."
-                 : "아래 터미널에서 키를 만들고 서버에 등록합니다. ssh-keygen의 키 암호는 직접 정합니다. 빈 암호도 허용되므로 보호하려면 암호를 입력하세요. 서버 비밀번호·키 암호는 이 터미널에서만 입력하며 앱과 키체인에 저장하지 않습니다.")
+                 : "아래 터미널에서 키를 만들고 서버에 등록합니다. 서버 비밀번호는 최초 등록에 필요한 경우에만 입력하세요. 키 암호를 설정하면 Mac에 보관하는 개인 키 파일을 암호화합니다. 빈 키 암호도 허용됩니다. 입력한 서버 비밀번호와 키 암호는 앱에 저장하지 않습니다.")
                 .font(.caption).foregroundStyle(appearance.colors.muted)
             if let setup {
                 TerminalPane(host: terminal, id: setup.id, style: appearance.terminalStyle)

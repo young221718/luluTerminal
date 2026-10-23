@@ -1,3 +1,0 @@
-#!/bin/sh
-# A UI rebuild must not change the executable trusted to read SSH passwords.
-exec "$(dirname "$0")/luluTerminalKeychain" --ssh-askpass "$@"

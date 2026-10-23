@@ -2,23 +2,11 @@ import SwiftUI
 import InfraTerminalUI
 import TerminalBridge
 import InfraCore
-import Darwin
 
 // CLT's SDK 27 lacks the new @State macro plugin; use the stable wrapper.
 private typealias ViewState<Value> = SwiftUI.State<Value>
 
-@main enum InfraTerminalEntry {
-    @MainActor static func main() {
-        // OpenSSH invokes the same signed executable without starting SwiftUI or a Dock app.
-        if CommandLine.arguments.dropFirst().first == "--ssh-askpass" {
-            exit(SSHPasswordAuthentication.respondToAskpass(arguments: CommandLine.arguments,
-                                                          environment: ProcessInfo.processInfo.environment))
-        }
-        InfraTerminalApp.main()
-    }
-}
-
-struct InfraTerminalApp: App {
+@main struct InfraTerminalApp: App {
     @StateObject private var appearance = AppearancePreferences(defaults: CommandLine.arguments.contains("--demo") ? UserDefaults(suiteName: "dev.chanyoung.infra-terminal.demo")! : .standard)
     @StateObject private var monitoring = MonitoringPreferences(defaults: CommandLine.arguments.contains("--demo") ? UserDefaults(suiteName: "dev.chanyoung.infra-terminal.demo")! : .standard)
     @StateObject private var connectionPreferences = ConnectionPreferences(defaults: CommandLine.arguments.contains("--demo") ? UserDefaults(suiteName: "dev.chanyoung.infra-terminal.demo")! : .standard)

@@ -14,11 +14,10 @@ struct SSHConnectionFailureTests {
         #expect(!failure.blocksAutomaticRetry)
     }
 
-    @Test func authenticationHostKeyAndKeychainAreDistinct() {
+    @Test func authenticationAndHostKeyAreDistinct() {
         #expect(SSHConnectionFailure.classify(exitCode: 255, stderr: "trainer@example.invalid: Permission denied (publickey,password).") == .authentication)
         #expect(SSHConnectionFailure.classify(exitCode: 255, stderr: "sign_and_send_pubkey: signing failed for ED25519: agent refused operation") == .authentication)
         #expect(SSHConnectionFailure.classify(exitCode: 255, stderr: "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!\nHost key verification failed.") == .hostKey)
-        #expect(SSHConnectionFailure.classify(exitCode: 255, stderr: SSHPasswordAuthentication.keychainAccessRequiredMarker) == .keychainAccess)
         #expect(SSHConnectionFailure.hostKey.blocksAutomaticRetry)
         #expect(SSHConnectionFailure.authentication.blocksAutomaticRetry)
     }

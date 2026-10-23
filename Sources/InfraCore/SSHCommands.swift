@@ -13,7 +13,7 @@ public struct ShellCommand: Sendable {
 }
 
 public enum SSHCommandBuilder {
-    private static func base(server: ServerProfile, account: SSHAccount, interactive: Bool, authentication: SSHAuthenticationContext?, manualAuthentication: Bool, managedKeyRootURL: URL?) throws -> [String] {
+    private static func base(server: ServerProfile, account: SSHAccount, interactive: Bool, managedKeyRootURL: URL?) throws -> [String] {
         guard server.kind == .ssh else { throw CoreError.invalidProfile("Local connections must not enter SSH commands.") }
         try server.validate()
         guard server.accounts.contains(account) else { throw CoreError.invalidProfile("Account does not belong to this server.") }
@@ -22,41 +22,23 @@ public enum SSHCommandBuilder {
             try SSHManagedKeys.validate(reference: reference, server: server, account: account)
             return SSHManagedKeys.connectionArguments(reference: reference, interactive: interactive, rootURL: managedKeyRootURL)
         }
-        if account.authMethod == .password && !manualAuthentication {
-            guard let authentication, account.credential == authentication.reference,
-                  authentication.reference.target.matches(server: server, account: account),
-                  SSHPasswordAuthentication.validHost(authentication.reference.target.resolvedHost) else {
-                throw SSHPasswordError.message("저장된 비밀번호를 확인하고 다시 연결하세요.")
-            }
-            return [interactive ? "-tt" : "-T", "-o", "StrictHostKeyChecking=yes", "-o", "BatchMode=no",
-                    "-o", "ConnectTimeout=5", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=2",
-                    "-o", "NoHostAuthenticationForLocalhost=no",
-                    "-o", "PreferredAuthentications=password", "-o", "PasswordAuthentication=yes",
-                    "-o", "PubkeyAuthentication=no", "-o", "KbdInteractiveAuthentication=no",
-                    "-o", "NumberOfPasswordPrompts=1", "-o", "ControlMaster=no", "-o", "ControlPath=none",
-                    "-o", "ControlPersist=no", "-o", "ProxyJump=none", "-o", "ProxyCommand=none",
-                    "-o", "CanonicalizeHostname=no", "-o", "PermitLocalCommand=no",
-                    "-o", "HostName=" + authentication.reference.target.resolvedHost,
-                    "-p", String(server.port), "-l", account.username, "--", server.host]
-        }
-        return [interactive ? "-tt" : "-T", "-o", interactive ? "StrictHostKeyChecking=ask" : "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=5",
+        return [interactive ? "-tt" : "-T", "-o", "UseKeychain=no", "-o", "AddKeysToAgent=no", "-o", interactive ? "StrictHostKeyChecking=ask" : "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=5",
                 "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=2"]
             + ["-o", interactive ? "BatchMode=no" : "BatchMode=yes"]
             + ["-p", String(server.port), "-l", account.username, "--", server.host]
     }
-    private static func environment(account: SSHAccount, authentication: SSHAuthenticationContext?, manualAuthentication: Bool, managedKeyAgentSocket: String?) throws -> [String: String] {
+    private static func environment(account: SSHAccount, managedKeyAgentSocket: String?) throws -> [String: String] {
         if account.authMethod == .managedKey {
             return try SSHManagedKeys.environment(agentSocket: managedKeyAgentSocket ?? ProcessInfo.processInfo.environment["SSH_AUTH_SOCK"] ?? "")
         }
-        if manualAuthentication { return ["SSH_ASKPASS_REQUIRE": "never", "LULUTERMINAL_SSH_REFERENCE": ""] }
-        return account.authMethod == .password ? authentication?.environment ?? [:] : [:]
+        return ["SSH_ASKPASS_REQUIRE": "never", "SSH_ASKPASS": ""]
     }
     private static func validate(tab: TerminalTab, server: ServerProfile, account: SSHAccount) throws {
         guard tab.serverID == server.id, tab.accountID == account.id else {
             throw CoreError.invalidWorkspace("Tab identity does not match the SSH server/account.")
         }
     }
-    public static func terminal(server: ServerProfile, account: SSHAccount, tab: TerminalTab, create: Bool, authentication: SSHAuthenticationContext? = nil, manualAuthentication: Bool = false, managedKeyAgentSocket: String? = nil, managedKeyRootURL: URL? = nil) throws -> ShellCommand {
+    public static func terminal(server: ServerProfile, account: SSHAccount, tab: TerminalTab, create: Bool, managedKeyAgentSocket: String? = nil, managedKeyRootURL: URL? = nil) throws -> ShellCommand {
         try validate(tab: tab, server: server, account: account)
         let target = ShellCommand.quote("=" + tab.sessionName)
         let script: String
@@ -67,14 +49,14 @@ public enum SSHCommandBuilder {
                 + "tmux has-session -t " + target + " 2>/dev/null || { printf '%s\\n' 'Remote tmux session is missing. Choose Create session to start a new session.' >&2; exit 44; }; "
                 + "exec tmux attach-session -t " + target
         }
-        return ShellCommand(executable: "/usr/bin/ssh", arguments: try base(server: server, account: account, interactive: true, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyRootURL: managedKeyRootURL) + [script], environment: try environment(account: account, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedKeyAgentSocket))
+        return ShellCommand(executable: "/usr/bin/ssh", arguments: try base(server: server, account: account, interactive: true, managedKeyRootURL: managedKeyRootURL) + [script], environment: try environment(account: account, managedKeyAgentSocket: managedKeyAgentSocket))
     }
-    public static func probe(server: ServerProfile, account: SSHAccount, tab: TerminalTab, authentication: SSHAuthenticationContext? = nil, manualAuthentication: Bool = false, managedKeyAgentSocket: String? = nil, managedKeyRootURL: URL? = nil) throws -> ShellCommand {
+    public static func probe(server: ServerProfile, account: SSHAccount, tab: TerminalTab, managedKeyAgentSocket: String? = nil, managedKeyRootURL: URL? = nil) throws -> ShellCommand {
         try validate(tab: tab, server: server, account: account)
         let script = "command -v tmux >/dev/null 2>&1 || exit 127; tmux has-session -t " + ShellCommand.quote("=" + tab.sessionName) + " 2>/dev/null || exit 44"
-        return ShellCommand(executable: "/usr/bin/ssh", arguments: try base(server: server, account: account, interactive: false, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyRootURL: managedKeyRootURL) + [script], environment: try environment(account: account, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedKeyAgentSocket))
+        return ShellCommand(executable: "/usr/bin/ssh", arguments: try base(server: server, account: account, interactive: false, managedKeyRootURL: managedKeyRootURL) + [script], environment: try environment(account: account, managedKeyAgentSocket: managedKeyAgentSocket))
     }
-    public static func monitor(server: ServerProfile, account: SSHAccount, authentication: SSHAuthenticationContext? = nil, manualAuthentication: Bool = false, managedKeyAgentSocket: String? = nil, managedKeyRootURL: URL? = nil) throws -> ShellCommand {
-        ShellCommand(executable: "/usr/bin/ssh", arguments: try base(server: server, account: account, interactive: false, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyRootURL: managedKeyRootURL) + ["sh -s"], standardInput: LinuxCollector.script, environment: try environment(account: account, authentication: authentication, manualAuthentication: manualAuthentication, managedKeyAgentSocket: managedKeyAgentSocket))
+    public static func monitor(server: ServerProfile, account: SSHAccount, managedKeyAgentSocket: String? = nil, managedKeyRootURL: URL? = nil) throws -> ShellCommand {
+        ShellCommand(executable: "/usr/bin/ssh", arguments: try base(server: server, account: account, interactive: false, managedKeyRootURL: managedKeyRootURL) + ["sh -s"], standardInput: LinuxCollector.script, environment: try environment(account: account, managedKeyAgentSocket: managedKeyAgentSocket))
     }
 }

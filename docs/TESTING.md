@@ -4,7 +4,7 @@
 
 ## 실행
 
-저장소 루트에서 실행한다. UI·TerminalBridge 검사는 macOS와 Ghostty 의존성이 필요하다.
+저장소 루트에서 실행한다. UI·TerminalBridge 검사는 macOS와 Ghostty 의존성이 필요하며 UI 빌드는 macOS 27 SDK를 사용한다. 앱의 실행 최소 버전은 macOS 14다.
 
 ```bash
 bash scripts/test.sh
@@ -40,7 +40,7 @@ INFRA_CORE_ONLY 명령은 Core만 검사하므로 전체 검증을 대신하지 
 | InfraTerminalUITests / HexColorInputTests | UI-04; 색 입력 검증 |
 | InfraTerminalUITests / PanelLayoutTests | UI-03; 좁은 창·드래그·접기·복원 |
 | InfraTerminalUITests / ResourceInterpolationTests | UI-06; 보간 시간·중간 숫자·미측정 |
-| InfraTerminalUITests / ServerOrderTests | WS-02; 순서·무효 이동·실패 보존 |
+| InfraTerminalUITests / ServerOrderTests | WS-02; 순서·무효 이동·실패 보존·native 단일 행 이동의 대상 매핑 |
 | InfraTerminalUITests / ConnectionLifecycleTests | REC-01·02; opt-in 저장·초기 경로 무시·절전/경로 이벤트 병합·중단 |
 | InfraTerminalUITests / QuickSwitcherTests | UI-08; 토큰 검색·한글·계정·열린 탭·identity·선택 시 연결 보존·native 방향키/IME 정책/포커스 |
 | TerminalBridgeTests / TerminalSearchTests | TERM-06; 기존 surface 검색·결과·세대·닫기·모달·단축키·반복 포커스 요청 |
@@ -75,6 +75,8 @@ fixture는 실제로 공유되는 범위에서만 internal로 열고 도메인 r
 - 실제 SSH 비밀번호 로그인·키 등록, 재시작 후 agent 잠금 해제, IME 조합·VoiceOver, 장시간 수집은 별도 native/실서버 수락 검사다. 과거 키체인 항목 정리는 별도 승인·실행·readback이 필요하며 앱 코드·패키지 검사로 대체하지 않는다.
 
 ## 남은 검사 공백
+
+서버 순서 매핑·저장 검사는 macOS 27의 실제 드래그 애니메이션·삽입 위치·취소를 대체하지 않는다. 실제 마우스로 정방향·역방향 이동, Escape·밖에 놓기, 긴 목록 자동 스크롤과 저장 실패 시 화면 복원을 확인한다. macOS 14–26의 행 미리보기·동작 줄이기 역시 해당 OS 수락이 별도로 필요하다.
 
 자동 설정의 지연 중 취소·검증 후 저장 실패·별칭 대상 변경은 합성 실행기로 검사한다. 실제 NAS의 password 정책·호스트 신뢰·홈 권한·공개 키 허용과 최종 자원 수집은 사용자 직접 인증 후 별도 확인한다. 기존 암호화 키에서 상속 socket이 없어 launchctl에서 agent를 찾는 환경과 VoiceOver·다양한 IME는 전체 실환경 수락이 끝난 것으로 주장하지 않는다.
 

@@ -21,6 +21,7 @@ public struct InfraRootView: View {
     @ViewState private var deletingServer: ServerProfile?
     @ViewState private var showNewTab = false
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ViewState private var renamingTab: TerminalTab?
     @ViewState private var renamedTitle = ""
     @ViewState private var actionError: String?
@@ -235,16 +236,44 @@ public struct InfraRootView: View {
                 Button { editingProfile = nil; showProfile = true } label: { Image(systemName: "plus") }
                     .buttonStyle(.plain).help("서버 추가").accessibilityLabel("서버 추가")
             }.padding(.horizontal, 14).padding(.top, 15).padding(.bottom, 12)
-            ScrollView {
-                LazyVStack(spacing: 3) {
-                    ForEach(model.workspace.servers) { server in serverRow(server) }
-                }.padding(.horizontal, 7).padding(.bottom, 10)
-            }
+            sidebarServers
             if model.workspace.servers.isEmpty {
                 Text("첫 서버를 추가하세요").font(.caption).foregroundStyle(appearance.colors.muted).padding(.bottom, 24)
             }
             Text("부엉이 클릭 · 자원 열기").font(.system(size: 10)).foregroundStyle(appearance.colors.muted).padding(12)
         }.background(appearance.colors.sidebar)
+    }
+
+    @ViewBuilder private var sidebarServers: some View {
+        if #available(macOS 27, *) {
+            ScrollView {
+                LazyVStack(spacing: 3) {
+                    ForEach(model.workspace.servers) { server in serverRow(server) }
+                        .reorderable()
+                }.padding(.horizontal, 7).padding(.bottom, 10)
+                .reorderContainer(for: ServerProfile.self) { difference in
+                    guard let move = ServerReorderMove(sources: difference.sources, destination: difference.destination.position,
+                                                       serverIDs: model.workspace.servers.map(\.id)) else { return }
+                    do { try model.moveServer(move.id, relativeTo: move.targetID, after: move.after) }
+                    catch { actionError = error.localizedDescription }
+                }
+            }
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 3) {
+                    ForEach(model.workspace.servers) { server in
+                        serverRow(server)
+                            .modifier(ServerReorderModifier(id: server.id, previewBackground: appearance.colors.sidebar) { draggedID, after in
+                                do {
+                                    _ = try withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                                        try model.moveServer(draggedID, relativeTo: server.id, after: after)
+                                    }
+                                } catch { actionError = error.localizedDescription }
+                            })
+                    }
+                }.padding(.horizontal, 7).padding(.bottom, 10)
+            }
+        }
     }
 
     private func serverRow(_ server: ServerProfile) -> some View {
@@ -265,10 +294,6 @@ public struct InfraRootView: View {
             }.buttonStyle(.plain)
         }.padding(.horizontal, 8).frame(height: 53)
             .background(model.workspace.selectedServerID == server.id ? appearance.colors.accent.opacity(0.09) : Color.clear, in: RoundedRectangle(cornerRadius: 7))
-            .modifier(ServerReorderModifier(id: server.id) { draggedID, after in
-                do { try model.moveServer(draggedID, relativeTo: server.id, after: after) }
-                catch { actionError = error.localizedDescription }
-            })
             .help("드래그하여 서버 순서 변경")
             .accessibilityElement(children: .contain)
             .accessibilityAddTraits(model.workspace.selectedServerID == server.id ? [.isSelected] : [])

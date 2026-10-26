@@ -1,6 +1,53 @@
 import SwiftUI
 import InfraCore
 
+struct ProfileEditImpact {
+    struct AccountChange {
+        let id: UUID
+        let originalUsername: String
+        let updatedUsername: String?
+    }
+    let changes: [AccountChange]
+    let openTabCount: Int
+    let closedTabCount: Int
+    var requiresConfirmation: Bool { !changes.isEmpty }
+    init(original: ServerProfile?, draft: ServerProfile, tabs: [TerminalTab]) {
+        changes = original?.accounts.compactMap { account in
+            let updated = draft.accounts.first { $0.id == account.id }
+            guard updated?.username != account.username else { return nil }
+            return AccountChange(id: account.id, originalUsername: account.username, updatedUsername: updated?.username)
+        } ?? []
+        let accountIDs = Set(changes.map(\.id))
+        let affected = tabs.filter { $0.serverID == original?.id && accountIDs.contains($0.accountID) }
+        openTabCount = affected.filter { !$0.isClosed }.count
+        closedTabCount = affected.filter(\.isClosed).count
+    }
+
+    var confirmationMessage: String {
+        let accounts = changes.map { change in
+            if let username = change.updatedUsername { return "이름 변경: \(change.originalUsername) → \(username)" }
+            return "계정 삭제: \(change.originalUsername)"
+        }.joined(separator: "\n")
+        return "\(accounts)\n\n위 계정의 열린 탭 \(openTabCount)개와 닫힌 탭 기록 \(closedTabCount)개를 앱에서 제거합니다. 이 서버의 앱 연결은 모두 해제됩니다.\n\n원격 로그인 계정·파일·tmux 세션과 로컬 SSH 키 파일은 유지됩니다. 이름이 바뀐 계정은 새 계정으로 저장되며 관리 키 연결이 해제됩니다. 앱에서 설정한 키를 사용하려면 저장 후 ‘SSH 키 설정’을 다시 진행하세요."
+    }
+}
+
+struct ServerDeletionImpact {
+    let serverName: String
+    let openTabCount: Int
+    let closedTabCount: Int
+    init(server: ServerProfile, tabs: [TerminalTab]) {
+        serverName = server.name
+        let affected = tabs.filter { $0.serverID == server.id }
+        openTabCount = affected.filter { !$0.isClosed }.count
+        closedTabCount = affected.filter(\.isClosed).count
+    }
+
+    var confirmationMessage: String {
+        "‘\(serverName)’ 서버 등록과 열린 탭 \(openTabCount)개, 닫힌 탭 기록 \(closedTabCount)개를 앱에서 제거하고 이 서버의 앱 연결을 해제합니다.\n\n원격 로그인 계정·파일·tmux 세션과 로컬 SSH 키 파일은 유지됩니다."
+    }
+}
+
 struct ProfileEditor: View {
     @EnvironmentObject private var appearance: AppearancePreferences
     @Environment(\.dismiss) private var dismiss
@@ -8,17 +55,20 @@ struct ProfileEditor: View {
     @ViewState private var port: String
     @ViewState private var error: String?
     @ViewState private var saving = false
-    let lockedAccountIDs: Set<UUID>
+    @ViewState private var confirmingChanges = false
+    let originalProfile: ServerProfile?
+    let tabs: [TerminalTab]
     let isNew: Bool
     let demo: Bool
     let save: (ServerProfile) async throws -> Void
 
-    init(profile: ServerProfile?, lockedAccountIDs: Set<UUID>, demo: Bool = false, save: @escaping (ServerProfile) async throws -> Void) {
+    init(profile: ServerProfile?, tabs: [TerminalTab], demo: Bool = false, save: @escaping (ServerProfile) async throws -> Void) {
         let account = SSHAccount(username: "")
         let value = profile ?? ServerProfile(name: "", host: "", accounts: [account], monitorAccountID: account.id)
         _profile = State(initialValue: value)
         _port = State(initialValue: String(value.port))
-        self.lockedAccountIDs = lockedAccountIDs
+        self.originalProfile = profile
+        self.tabs = tabs
         self.isNew = profile == nil
         self.demo = demo
         self.save = save
@@ -28,6 +78,10 @@ struct ProfileEditor: View {
         VStack(alignment: .leading, spacing: 18) {
             Text(isNew ? "서버 추가" : "서버 편집").font(.title2.weight(.semibold))
             Text("서버 비밀번호는 저장하지 않습니다. 서버를 저장한 뒤 ‘SSH 키 설정’에서 키를 생성하고, 최초 등록에 필요한 인증은 터미널에서 진행하세요.").font(.caption).foregroundStyle(appearance.colors.muted)
+            if !isNew {
+                Text("저장하면 이 서버의 앱 연결은 모두 해제됩니다. 원격 작업은 유지됩니다.")
+                    .font(.caption).foregroundStyle(appearance.colors.muted)
+            }
             Form {
                 TextField("서버 별칭", text: $profile.name)
                 TextField("SSH IP(SSH 저장명)", text: $profile.host)
@@ -37,30 +91,32 @@ struct ProfileEditor: View {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 TextField("계정 이름", text: $account.username)
-                                    .disabled(lockedAccountIDs.contains(account.id))
-                                if lockedAccountIDs.contains(account.id) {
-                                    Image(systemName: "lock").help("열린 탭 또는 닫힌 탭이 사용하는 계정입니다. 다른 사용자는 새 계정으로 추가하세요.")
-                                        .accessibilityLabel("탭이 사용 중인 계정, 변경 불가")
-                                } else if profile.accounts.count > 1 {
-                                    Button {
-                                        let removed = account.id
-                                        profile.accounts.removeAll { $0.id == removed }
-                                        if profile.monitorAccountID == removed { profile.monitorAccountID = profile.accounts.first?.id }
-                                    } label: { Image(systemName: "minus.circle") }
-                                    .buttonStyle(.borderless).accessibilityLabel("\(account.username) 계정 제거")
-                                }
+                                Button(role: .destructive) {
+                                    let removed = account.id
+                                    profile.accounts.removeAll { $0.id == removed }
+                                    if profile.monitorAccountID == removed { profile.monitorAccountID = profile.accounts.first?.id }
+                                } label: { Label("계정 삭제", systemImage: "trash") }
+                                .buttonStyle(.borderless).disabled(profile.accounts.count <= 1)
+                                .accessibilityLabel("\(account.username) 계정 삭제")
                             }
                             Picker("인증 방식", selection: $account.authMethod) {
                                 Text("SSH 키·기존 설정").tag(SSHAuthenticationMethod.system)
                                 if account.managedKey != nil {
                                     Text("앱에서 설정한 SSH 키").tag(SSHAuthenticationMethod.managedKey)
                                 }
-                            }.disabled(demo)
-                            if account.authMethod == .managedKey {
+                            }.disabled(demo || accountWasRenamed(account))
+                            if accountWasRenamed(account) {
+                                Text("계정 이름을 변경하면 새 계정으로 저장되고 관리 키 연결이 해제됩니다. 앱에서 설정한 키를 사용하려면 저장 후 ‘SSH 키 설정’을 다시 진행하세요. 기존 SSH 키 파일은 유지됩니다.")
+                                    .font(.caption).foregroundStyle(appearance.colors.muted)
+                            } else if account.authMethod == .managedKey {
                                 Text("설정한 키를 사용합니다. 키 암호가 필요하면 서버 메뉴의 ‘SSH 키 잠금 해제’를 선택하세요. 연결 대상을 바꾸려면 먼저 ‘SSH 키·기존 설정’으로 저장한 뒤 새 키를 설정하세요.")
                                     .font(.caption).foregroundStyle(appearance.colors.muted)
                             }
                         }.padding(.vertical, 4)
+                    }
+                    if profile.accounts.count == 1 {
+                        Text("마지막 계정은 삭제할 수 없습니다. 서버 전체를 지우려면 서버 메뉴의 ‘서버 삭제…’를 사용하세요.")
+                            .font(.caption).foregroundStyle(appearance.colors.muted)
                     }
                     Button("계정 추가", systemImage: "plus") { profile.accounts.append(SSHAccount(username: "")) }
                 }
@@ -84,16 +140,38 @@ struct ProfileEditor: View {
             }
         }.padding(24).frame(width: 540).interactiveDismissDisabled(saving)
             .background(appearance.colors.panel).foregroundStyle(appearance.colors.text).tint(appearance.colors.accent)
+            .alert("계정 변경을 저장할까요?", isPresented: $confirmingChanges) {
+                Button("취소", role: .cancel) {}
+                Button("변경 후 저장", role: .destructive) { persistProfile() }
+            } message: {
+                Text(ProfileEditImpact(original: originalProfile, draft: profile, tabs: tabs).confirmationMessage)
+            }
     }
+
+    private func accountWasRenamed(_ account: SSHAccount) -> Bool {
+        originalProfile?.accounts.first { $0.id == account.id }.map { $0.username != account.username } ?? false
+    }
+
     private func submit() {
         guard !saving else { return }
         guard let number = Int(port) else { error = "포트는 1~65535의 정수여야 합니다."; return }
         profile.port = number
         profile.name = profile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        do { try profile.validate() }
+        catch { self.error = error.localizedDescription; return }
+        error = nil
+        if ProfileEditImpact(original: originalProfile, draft: profile, tabs: tabs).requiresConfirmation {
+            confirmingChanges = true
+        } else { persistProfile() }
+    }
+
+    private func persistProfile() {
+        guard !saving else { return }
         saving = true
         error = nil
+        let submittedProfile = profile
         Task { @MainActor in
-            do { try await save(profile); dismiss() }
+            do { try await save(submittedProfile); dismiss() }
             catch { self.error = error.localizedDescription }
             saving = false
         }

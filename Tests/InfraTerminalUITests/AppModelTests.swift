@@ -17,7 +17,7 @@ struct AppModelTests {
         #expect(try Data(contentsOf: url) == original)
     }
 
-    @Test func testUsernameChangeCannotRetargetAnExistingTab() throws {
+    @Test func testUsernameChangeCreatesNewIdentityWithoutRetargetingExistingTab() throws {
         let model = AppModel(demo: false, storeURL: temporaryURL())
         let profile = server()
         try model.saveProfile(profile)
@@ -25,9 +25,13 @@ struct AppModelTests {
         model.closeTab(tab.id)
         var changed = profile
         changed.accounts[0].username = "someone-else"
-        #expect(throws: (any Error).self) { try model.saveProfile(changed) }
-        #expect(model.workspace.servers.first { $0.id == profile.id }?.accounts.first?.username == "trainer")
-        #expect(model.workspace.tabs.first { $0.id == tab.id }?.accountID == profile.accounts[0].id)
+        try model.saveProfile(changed)
+        let saved = try #require(model.workspace.servers.first { $0.id == profile.id })
+        #expect(saved.accounts[0].username == "someone-else")
+        #expect(saved.accounts[0].id != profile.accounts[0].id)
+        #expect(saved.monitorAccountID == saved.accounts[0].id)
+        #expect(!model.workspace.tabs.contains { $0.id == tab.id })
+        #expect(try StateStore(url: model.storeURL).load() == model.workspace)
     }
 
     @Test func testSelectionAndClosedTabSurviveReload() throws {

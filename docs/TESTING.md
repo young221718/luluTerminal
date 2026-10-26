@@ -33,7 +33,7 @@ INFRA_CORE_ONLY 명령은 Core만 검사하므로 전체 검증을 대신하지 
 | InfraTerminalUITests / CustomAppearancePreferencesTests | UI-04·05; 색·폰트 검증·복원 |
 | InfraTerminalUITests / MonitoringPreferencesTests | MON-01, UI-01·03; 설정 저장·터미널 보존 |
 | InfraTerminalUITests / LocalMacTests | LOCAL-01·02, DEMO-01; 초기화·로드·연결·수집·재실행 |
-| InfraTerminalUITests / ProfileEditorTests | SSH-05; 저장 비밀번호 입력 필드 제거 |
+| InfraTerminalUITests / ProfileEditorTests | WS-05·06, SSH-05; 계정 변경·삭제 영향도, 탭 수, native 기존 계정 입력 가능, 비밀번호 입력 필드 제거 |
 | InfraTerminalUITests / HexColorInputTests | UI-04; 색 입력 검증 |
 | InfraTerminalUITests / PanelLayoutTests | UI-03; 좁은 창·드래그·접기·복원 |
 | InfraTerminalUITests / ResourceInterpolationTests | UI-06; 보간 시간·중간 숫자·미측정 |
@@ -53,6 +53,7 @@ INFRA_CORE_ONLY 명령은 Core만 검사하므로 전체 검증을 대신하지 
 | 파일 | 책임 |
 | --- | --- |
 | AppModelTests.swift | 저장 상태·계정 identity·탭·세션 재접속 |
+| AccountManagementTests.swift | WS-05·06, LOCAL-01; 계정 이름 변경·키 바인딩 분리·계정 삭제·서버 삭제·모니터링/선택 정합성·저장 실패 보존·진행 중 연결/수집/키 설정 무효화 |
 | AppModelAuthenticationMigrationTests.swift | SSH-02·03·05; legacy password JSON 변환·identity와 휴면 관리 키 메타데이터 보존·저장 시 credential 제거·수동 터미널 fallback·원자적 저장 실패·인증 경합·취소 |
 | AppModelManagedKeyTests.swift | KEY-01·02·03·04; 관리 키 활성화·취소·stale 대상·agent·모니터링 |
 | AppModelMonitoringTests.swift | 수집 슬롯·중복 방지·기아 방지·이력 무효화·unknown |
@@ -63,7 +64,7 @@ fixture는 실제로 공유되는 범위에서만 internal로 열고 도메인 r
 
 ## 격리·증거 기준
 
-- 모델 검사는 임시 상태 저장소와 주입된 실행기를 사용한다. 실사용 workspace JSON·Keychain·서버를 수정하지 않는다.
+- 모델 검사는 임시 상태 저장소와 주입된 실행기를 사용한다. 실사용 workspace JSON·Keychain·서버를 수정하지 않는다. 계정·서버 삭제는 합성 프로필로 검증하고 실제 앱에서는 확인 창 취소와 편집 취소만 검사한다.
 - 관리 키 검사는 임시 agent·PTY·키 디렉터리·로컬 원격 파일 fixture를 사용한다. 실제 사용자 키의 내용이나 비밀번호를 출력하지 않는다.
 - 프로세스 검사는 실제 로컬 부모·sleep 자식 PID와 전용 프로세스 그룹을 확인한 뒤 timeout/취소한다. 직접 자식은 waitpid 회수까지 확인한다. 손자 프로세스는 종료를 검사하되 orphan zombie를 OS가 수거하는 시점은 보장하지 않는다.
 - 메모리 안정성을 테스트 통과나 단일 RSS 숫자로 단정하지 않는다. native surface 해제 회귀 검사와 실제 반복 RSS·자식 프로세스 관찰은 각각 기록한다.

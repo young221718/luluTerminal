@@ -34,12 +34,13 @@ public final class AppModel: ObservableObject {
     private let agentEnvironment: [String: String]
     private struct AccountKey: Hashable { let serverID: UUID; let accountID: UUID }
     private var pausedAuthentication: [AccountKey: SSHConnectionFailure] = [:]
-    private var activeAuthentication: Set<AccountKey> = []
+    private var activeAuthentication: [AccountKey: UUID] = [:]
     private var keySetupTokens: [AccountKey: UUID] = [:]
     private var verifyingKeySetups: Set<UUID> = []
     private var previous: [UUID: RawMetrics] = [:]
     private var lastAttempts: [UUID: Date] = [:]
     private var polls: [UUID: Task<Void, Never>] = [:]
+    private var pollTokens: [UUID: UUID] = [:]
     private var connectionTokens: [UUID: UUID] = [:]
     private var connectionChecks: [UUID: Task<ProcessResult, Error>] = [:]
     private var connectionRecoveryEnabled = false
@@ -131,7 +132,7 @@ public final class AppModel: ObservableObject {
     private func invalidateConnection(_ id: UUID) {
         connectionTokens[id] = nil
         connectionChecks.removeValue(forKey: id)?.cancel()
-        connections[id] = .disconnected
+        connections[id] = workspace.tabs.contains(where: { $0.id == id }) ? .disconnected : nil
     }
 
     func terminalExited(_ id: UUID) {
@@ -181,8 +182,23 @@ public final class AppModel: ObservableObject {
     }
 
     func saveProfile(_ profile: ServerProfile) throws {
-        try validateProfileEdit(profile)
-        try commitProfile(profile)
+        var candidate = profile
+        if let old = workspace.servers.first(where: { $0.id == profile.id }) {
+            for index in candidate.accounts.indices {
+                let account = candidate.accounts[index]
+                guard let previous = old.accounts.first(where: { $0.id == account.id }), previous.username != account.username else { continue }
+                candidate.accounts[index].id = UUID()
+                candidate.accounts[index].authMethod = .system
+                candidate.accounts[index].managedKey = nil
+                if candidate.monitorAccountID == account.id { candidate.monitorAccountID = candidate.accounts[index].id }
+            }
+            if let monitorID = candidate.monitorAccountID, old.accounts.contains(where: { $0.id == monitorID }),
+               !candidate.accounts.contains(where: { $0.id == monitorID }) {
+                candidate.monitorAccountID = candidate.accounts.first?.id
+            }
+        }
+        try validateProfileEdit(candidate)
+        try commitProfile(candidate)
     }
 
     private func validateProfileEdit(_ profile: ServerProfile) throws {
@@ -195,13 +211,29 @@ public final class AppModel: ObservableObject {
             guard let reference = account.managedKey else { throw UIError.message("서버를 저장한 뒤 SSH 키 설정을 완료하세요.") }
             try SSHManagedKeys.validate(reference: reference, server: profile, account: account)
         }
-        if let old = workspace.servers.first(where: { $0.id == profile.id }) {
-            for account in old.accounts where workspace.tabs.contains(where: { $0.serverID == old.id && $0.accountID == account.id }) {
-                guard profile.accounts.first(where: { $0.id == account.id })?.username == account.username else {
-                    throw UIError.message("열린 탭 또는 닫힌 탭이 사용하는 계정은 변경하거나 삭제할 수 없습니다. 새 계정을 추가하세요.")
-                }
-            }
+    }
+
+    func deleteServer(_ id: UUID) throws {
+        guard !persistenceBlocked else { throw UIError.message(persistenceError ?? "저장 파일 복구 전에는 서버를 삭제할 수 없습니다.") }
+        guard id != LocalMachine.serverID, let index = workspace.servers.firstIndex(where: { $0.id == id }),
+              workspace.servers[index].kind == .ssh else {
+            throw UIError.message("삭제할 SSH 서버를 선택하세요. 이 Mac은 삭제할 수 없습니다.")
         }
+        var candidate = workspace
+        let removedTabs = candidate.tabs.filter { $0.serverID == id }
+        candidate.servers.remove(at: index)
+        candidate.tabs.removeAll { $0.serverID == id }
+        candidate.selectedTabByServer[id] = nil
+        if candidate.selectedServerID == id {
+            candidate.selectedServerID = nil
+            if !candidate.servers.isEmpty { candidate.select(serverID: candidate.servers[min(index, candidate.servers.count - 1)].id) }
+        }
+        try saveCandidate(candidate)
+        workspace = candidate
+        for tab in removedTabs { disconnected(tab.id) }
+        invalidateProfileWork(id)
+        clearMeasurements(id)
+        lastAttempts[id] = nil
     }
 
     func prepareSSHKeySetup(serverID: UUID, accountID: UUID, unlock: Bool = false) async throws -> SSHKeySetup {
@@ -211,12 +243,12 @@ public final class AppModel: ObservableObject {
             throw UIError.message("저장된 SSH 서버와 계정을 선택하세요. 데모에서는 키를 설정하지 않습니다.")
         }
         let key = AccountKey(serverID: serverID, accountID: accountID)
-        guard keySetupTokens[key] == nil, !activeAuthentication.contains(key) else {
+        guard keySetupTokens[key] == nil, activeAuthentication[key] == nil else {
             throw UIError.message("이 계정의 인증 작업이 진행 중입니다. 완료 후 다시 시도하세요.")
         }
         let token = UUID()
         keySetupTokens[key] = token
-        activeAuthentication.insert(key)
+        activeAuthentication[key] = token
         do {
             let socket = try await availableSSHAgent()
             let target = try await SSHConnectionResolver.resolveTarget(server: server, account: account, execute: execute)
@@ -244,7 +276,7 @@ public final class AppModel: ObservableObject {
     func cancelSSHKeySetup(_ id: UUID) {
         guard let key = keySetupTokens.first(where: { $0.value == id })?.key else { return }
         keySetupTokens[key] = nil
-        activeAuthentication.remove(key)
+        if activeAuthentication[key] == id { activeAuthentication[key] = nil }
     }
 
     func verifyAndApplySSHKeySetup(_ setup: SSHKeySetup) async throws {
@@ -311,35 +343,58 @@ public final class AppModel: ObservableObject {
         return try await availableSSHAgent()
     }
 
-    private func commitProfile(_ profile: ServerProfile, disconnectTabs: Bool = true) throws {
-        let old = workspace.servers.first { $0.id == profile.id }
-        var candidate = workspace
-        if let index = candidate.servers.firstIndex(where: { $0.id == profile.id }) { candidate.servers[index] = profile }
-        else { candidate.servers.append(profile); candidate.select(serverID: profile.id) }
+    private func saveCandidate(_ candidate: WorkspaceState) throws {
         try candidate.validate()
         if !isDemo {
             do { try store.save(candidate); persistenceError = nil }
             catch { persistenceError = "저장 실패: \(error.localizedDescription)\n\(storeURL.path)"; throw error }
         }
+    }
+
+    private func clearMeasurements(_ id: UUID) {
+        previous[id] = nil
+        metrics[id] = nil
+        histories[id] = nil
+        collectionErrors[id] = nil
+    }
+
+    private func invalidateProfileWork(_ id: UUID) {
+        // Keep the in-flight slot until its executor returns, even after cancellation.
+        polls[id]?.cancel()
+        for token in keySetupTokens.filter({ $0.key.serverID == id }).map(\.value) { cancelSSHKeySetup(token) }
+        pausedAuthentication = pausedAuthentication.filter { $0.key.serverID != id }
+    }
+
+    private func commitProfile(_ profile: ServerProfile, disconnectTabs: Bool = true) throws {
+        let old = workspace.servers.first { $0.id == profile.id }
+        let oldTabs = workspace.tabs.filter { $0.serverID == profile.id }
+        var candidate = workspace
+        if let index = candidate.servers.firstIndex(where: { $0.id == profile.id }) { candidate.servers[index] = profile }
+        else { candidate.servers.append(profile); candidate.select(serverID: profile.id) }
+        let accountIDs = Set(profile.accounts.map(\.id))
+        candidate.tabs.removeAll { $0.serverID == profile.id && !accountIDs.contains($0.accountID) }
+        if let selected = candidate.selectedTabByServer[profile.id], !candidate.tabs.contains(where: { $0.id == selected && !$0.isClosed }) {
+            candidate.selectedTabByServer[profile.id] = candidate.tabs.last(where: { $0.serverID == profile.id && !$0.isClosed })?.id
+        }
+        try saveCandidate(candidate)
         workspace = candidate
         if disconnectTabs {
-            for tab in workspace.tabs where tab.serverID == profile.id { disconnected(tab.id) }
+            for tab in oldTabs { disconnected(tab.id) }
+            invalidateProfileWork(profile.id)
+        } else {
+            polls[profile.id]?.cancel()
         }
         if let old {
             let oldMonitor = old.accounts.first { $0.id == old.monitorAccountID }
             let newMonitor = profile.accounts.first { $0.id == profile.monitorAccountID }
             if old.host != profile.host || old.port != profile.port || old.monitorAccountID != profile.monitorAccountID || oldMonitor != newMonitor {
-                previous[profile.id] = nil
-                metrics[profile.id] = nil
-                histories[profile.id] = nil
-                collectionErrors[profile.id] = nil
+                clearMeasurements(profile.id)
             }
         }
         lastAttempts[profile.id] = nil
         if old?.accounts != profile.accounts || old?.host != profile.host || old?.port != profile.port {
             pausedAuthentication = pausedAuthentication.filter { $0.key.serverID != profile.id }
         }
-        polls[profile.id]?.cancel()
     }
 
     @discardableResult
@@ -393,7 +448,7 @@ public final class AppModel: ObservableObject {
         if automaticRecovery { automaticConnectionTokens[tabID] = token }
         connections[tabID] = .checking
         defer {
-            if ownsAuthentication { activeAuthentication.remove(key) }
+            if ownsAuthentication && activeAuthentication[key] == token { activeAuthentication[key] = nil }
             if automaticConnectionTokens[tabID] == token { automaticConnectionTokens[tabID] = nil }
             if connectionTokens[tabID] == token {
                 connectionChecks[tabID] = nil
@@ -423,7 +478,7 @@ public final class AppModel: ObservableObject {
                 guard !Task.isCancelled, connectionTokens[tabID] == token, workspace.servers.contains(server) else { return nil }
                 if retryAuthentication { pausedAuthentication[key] = nil; collectionErrors[server.id] = nil }
                 if protectedAuthentication {
-                    guard !activeAuthentication.contains(key) else {
+                    guard activeAuthentication[key] == nil else {
                         connections[tabID] = .failed("이 계정의 SSH 연결을 확인하고 있습니다. 잠시 후 다시 시도하세요.")
                         return nil
                     }
@@ -431,7 +486,7 @@ public final class AppModel: ObservableObject {
                         connections[tabID] = connectionState(for: failure)
                         return nil
                     }
-                    activeAuthentication.insert(key)
+                    activeAuthentication[key] = token
                     ownsAuthentication = true
                 }
             }
@@ -561,7 +616,7 @@ public final class AppModel: ObservableObject {
     private func isAuthenticationUnavailable(server: ServerProfile) -> Bool {
         guard let account = server.accounts.first(where: { $0.id == server.monitorAccountID }) else { return false }
         let key = AccountKey(serverID: server.id, accountID: account.id)
-        return pausedAuthentication[key] != nil || activeAuthentication.contains(key)
+        return pausedAuthentication[key] != nil || activeAuthentication[key] != nil
     }
 
     private func poll(_ id: UUID, at time: Date) {
@@ -570,21 +625,26 @@ public final class AppModel: ObservableObject {
         let managedKey = account.authMethod == .managedKey
         let protectedAuthentication = managedKey
         guard !protectedAuthentication || !isAuthenticationUnavailable(server: server) else { return }
-        if protectedAuthentication { activeAuthentication.insert(key) }
+        let token = UUID()
+        pollTokens[id] = token
+        if protectedAuthentication { activeAuthentication[key] = token }
         lastAttempts[id] = time
         polls[id] = Task { [weak self] in
             guard let self else { return }
             defer {
-                self.polls[id] = nil
-                if protectedAuthentication { self.activeAuthentication.remove(key) }
+                if self.pollTokens[id] == token {
+                    self.pollTokens[id] = nil
+                    self.polls[id] = nil
+                }
+                if protectedAuthentication && self.activeAuthentication[key] == token { self.activeAuthentication[key] = nil }
             }
             var receivedResult = false
             do {
                 let managedSocket = managedKey ? try await self.managedKeySocket(server: server, account: account) : nil
-                guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
+                guard !Task.isCancelled, self.pollTokens[id] == token, self.workspace.servers.contains(server) else { return }
                 let result = try await self.execute(SSHCommandBuilder.monitor(server: server, account: account, managedKeyAgentSocket: managedSocket), 8)
                 receivedResult = true
-                guard !Task.isCancelled, self.workspace.servers.contains(server) else { return }
+                guard !Task.isCancelled, self.pollTokens[id] == token, self.workspace.servers.contains(server) else { return }
                 guard result.exitCode == 0 else {
                     if result.exitCode == 255 {
                         let failure = SSHConnectionFailure.classify(exitCode: result.exitCode, stderr: result.stderr)
@@ -599,7 +659,7 @@ public final class AppModel: ObservableObject {
                 self.record(snapshot, for: id)
                 self.collectionErrors[id] = nil
             } catch {
-                if !Task.isCancelled, self.workspace.servers.contains(server) {
+                if !Task.isCancelled, self.pollTokens[id] == token, self.workspace.servers.contains(server) {
                     if protectedAuthentication && !receivedResult {
                         let failure = self.connectionFailure(for: error)
                         if failure.blocksAutomaticRetry { self.pausedAuthentication[key] = failure }

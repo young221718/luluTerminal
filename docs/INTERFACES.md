@@ -22,6 +22,8 @@ SSHCommandBuilder의 terminal/probe/monitor는 managedKeyAgentSocket 및 테스�
 
 ## InfraTerminalUI
 
+[ServerReorderModifier.swift](../Sources/InfraTerminalUI/ServerReorderModifier.swift)는 서버 행 재정렬을 담당한다. macOS 27에서는 `reorderable`·`reorderContainer`로 드래그 표시와 임시 배치를 시스템에 맡기고, 최종 단일 행 이동만 AppModel의 원자적 순서 저장에 전달한다. 이전 macOS는 앱 내부 UUID drag/drop과 명시적 행 미리보기를 유지한다. 호버 중 저장하거나 터미널 표면을 다시 만들지 않는다. 시스템 API의 동작은 [Apple의 재정렬 설명](https://developer.apple.com/videos/play/wwdc2026/271/)을 참고한다.
+
 [AppModel.swift](../Sources/InfraTerminalUI/AppModel.swift)는 MainActor에서 프로필·탭·저장·인증·수집을 조정한다. 실행기·상태 URL은 테스트에서 주입한다. 잘못되거나 오래된 async 결과가 최신 프로필과 세션을 바꾸지 않도록 대상과 token을 재검증한다.
 
 프로필 편집은 `saveProfile(_:)`, 서버 삭제는 `deleteServer(_:)`가 소유한다. 이름이 바뀐 계정에 새 UUID를 부여하고 이전 계정의 탭을 후보 상태에서 제거하므로 StateStore의 identity 검증을 우회하지 않는다. 후보 상태 저장 성공 뒤에만 연결·수집을 무효화하고 삭제된 참조를 정리한다. UI는 영향도 확인을 담당하며 저장 전에 기존 탭 ID를 포착해 성공 후 해당 터미널 표면을 해제한다. 삭제는 원격 명령이나 SSH 키 파일 삭제를 실행하지 않는다.

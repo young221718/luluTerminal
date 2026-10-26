@@ -18,6 +18,7 @@ public struct InfraRootView: View {
     @ViewState private var showQuickSwitcher = false
     @ViewState private var editingProfile: ServerProfile?
     @ViewState private var showProfile = false
+    @ViewState private var deletingServer: ServerProfile?
     @ViewState private var showNewTab = false
     @Environment(\.openSettings) private var openSettings
     @ViewState private var renamingTab: TerminalTab?
@@ -120,14 +121,21 @@ public struct InfraRootView: View {
             }
         }
         .sheet(isPresented: $showProfile) {
-            ProfileEditor(profile: editingProfile, lockedAccountIDs: Set(model.workspace.tabs.filter { $0.serverID == editingProfile?.id }.map(\.accountID)), demo: model.isDemo) { profile in
+            ProfileEditor(profile: editingProfile, tabs: model.workspace.tabs.filter { $0.serverID == editingProfile?.id }, demo: model.isDemo) { profile in
+                let previousTabIDs = model.workspace.tabs.filter { $0.serverID == profile.id }.map(\.id)
                 try model.saveProfile(profile)
-                for tab in model.workspace.tabs where tab.serverID == profile.id { terminal.disconnect(id: tab.id) }
+                for id in previousTabIDs { terminal.disconnect(id: id) }
             }
             .id(editingProfile?.id)
         }
         .sheet(item: $keySetupRequest) { request in
             SSHKeySetupView(model: model, request: request).id(request.id)
+        }
+        .alert("서버를 삭제할까요?", isPresented: Binding(get: { deletingServer != nil }, set: { if !$0 { deletingServer = nil } }), presenting: deletingServer) { server in
+            Button("취소", role: .cancel) { deletingServer = nil }
+            Button("서버 삭제", role: .destructive) { deleteServer(server) }
+        } message: { server in
+            Text(ServerDeletionImpact(server: server, tabs: model.workspace.tabs).confirmationMessage)
         }
         .sheet(isPresented: $showNewTab) {
             if let server = model.selectedServer {
@@ -268,6 +276,8 @@ public struct InfraRootView: View {
                 if server.kind == .ssh {
                     Button("서버 편집…") { editingProfile = server; showProfile = true }
                     sshKeyActions(server)
+                    Divider()
+                    Button("서버 삭제…", role: .destructive) { deletingServer = server }
                 }
             }
     }
@@ -332,6 +342,8 @@ public struct InfraRootView: View {
                 if server.kind == .ssh {
                     Button("서버 편집…") { editingProfile = server; showProfile = true }
                     sshKeyActions(server)
+                    Divider()
+                    Button("서버 삭제…", role: .destructive) { deletingServer = server }
                 }
                 Button(server.kind == .local ? "새 로컬 셸 탭" : "새 세션 만들기…") {
                     if server.kind == .local { showNewTab = true }
@@ -459,7 +471,17 @@ public struct InfraRootView: View {
 
     private var hasModalPresentation: Bool {
         showProfile || showNewTab || showQuickSwitcher || renamingTab != nil ||
-            keySetupRequest != nil || creatingSessionFor != nil || actionError != nil
+            keySetupRequest != nil || creatingSessionFor != nil || deletingServer != nil || actionError != nil
+    }
+
+    private func deleteServer(_ server: ServerProfile) {
+        guard server.kind == .ssh else { return }
+        let previousTabIDs = model.workspace.tabs.filter { $0.serverID == server.id }.map(\.id)
+        do {
+            try model.deleteServer(server.id)
+            for id in previousTabIDs { terminal.disconnect(id: id) }
+        } catch { actionError = error.localizedDescription }
+        deletingServer = nil
     }
 
     private var canSearch: Bool {

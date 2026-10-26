@@ -1,6 +1,6 @@
 # 모듈 경계와 구현 진입점
 
-기준: 2026-10-23 현행 구현. [SPEC](SPEC.md)의 계약을 구현하는 코드 위치를 연결한다. 변경에 뒤처지기 쉬운 Swift 선언 전체 복제 대신 실제 선언을 정본으로 사용한다. 정리 전 선언과 기록은 [원문](history/INTERFACES-before-organization-2026-10-23.md)에 보존했다.
+기준: 2026-10-26 현행 구현. [SPEC](SPEC.md)의 계약을 구현하는 코드 위치를 연결한다. 변경에 뒤처지기 쉬운 Swift 선언 전체 복제 대신 실제 선언을 정본으로 사용한다. 정리 전 선언과 기록은 [원문](history/INTERFACES-before-organization-2026-10-23.md)에 보존했다.
 
 ## InfraCore
 
@@ -21,6 +21,8 @@ SSHCommandBuilder의 terminal/probe/monitor는 managedKeyAgentSocket 및 테스�
 ## InfraTerminalUI
 
 [AppModel.swift](../Sources/InfraTerminalUI/AppModel.swift)는 MainActor에서 프로필·탭·저장·인증·수집을 조정한다. 실행기·상태 URL은 테스트에서 주입한다. 잘못되거나 오래된 async 결과가 최신 프로필과 세션을 바꾸지 않도록 대상과 token을 재검증한다.
+
+프로필 편집은 `saveProfile(_:)`, 서버 삭제는 `deleteServer(_:)`가 소유한다. 이름이 바뀐 계정에 새 UUID를 부여하고 이전 계정의 탭을 후보 상태에서 제거하므로 StateStore의 identity 검증을 우회하지 않는다. 후보 상태 저장 성공 뒤에만 연결·수집을 무효화하고 삭제된 참조를 정리한다. UI는 영향도 확인을 담당하며 저장 전에 기존 탭 ID를 포착해 성공 후 해당 터미널 표면을 해제한다. 삭제는 원격 명령이나 SSH 키 파일 삭제를 실행하지 않는다.
 
 managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 모두 성공해야 한다. 설정 터미널 종료 자체는 성공 신호가 아니다. 최초 서버 인증과 키 암호는 설정 터미널에 직접 입력하며 앱 모델이 받거나 저장하지 않는다. 암호 있는 키는 로그인 세션 agent에서 잠금을 해제한다.
 

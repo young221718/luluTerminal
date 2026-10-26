@@ -29,7 +29,8 @@ public enum SSHCommandBuilder {
     }
     private static func environment(account: SSHAccount, managedKeyAgentSocket: String?) throws -> [String: String] {
         if account.authMethod == .managedKey {
-            return try SSHManagedKeys.environment(agentSocket: managedKeyAgentSocket ?? ProcessInfo.processInfo.environment["SSH_AUTH_SOCK"] ?? "")
+            guard let reference = account.managedKey else { throw CoreError.invalidProfile("SSH 키 설정이 필요합니다.") }
+            return try SSHManagedKeys.environment(reference: reference, agentSocket: managedKeyAgentSocket)
         }
         return ["SSH_ASKPASS_REQUIRE": "never", "SSH_ASKPASS": ""]
     }

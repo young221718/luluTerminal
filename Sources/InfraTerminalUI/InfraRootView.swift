@@ -411,7 +411,10 @@ public struct InfraRootView: View {
                         Label(error, systemImage: "key").textSelection(.enabled)
                         HStack {
                             if model.account(for: tab)?.authMethod == .managedKey {
-                                Button("SSH 키 잠금 해제") { keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: tab.accountID, unlock: true) }
+                                let requiresAgent = model.account(for: tab)?.managedKey?.requiresAgent == true
+                                Button(requiresAgent ? "SSH 키 잠금 해제" : "SSH 키 다시 설정") {
+                                    keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: tab.accountID, unlock: requiresAgent)
+                                }
                             } else {
                                 Button("터미널에서 인증") { connect(tab, create: false, interactive: true) }
                             }
@@ -458,9 +461,9 @@ public struct InfraRootView: View {
                 }
             }
         }.disabled(model.isDemo)
-        if server.accounts.contains(where: { $0.managedKey != nil }) {
+        if server.accounts.contains(where: { $0.managedKey?.requiresAgent == true }) {
             Menu("SSH 키 잠금 해제") {
-                ForEach(server.accounts.filter { $0.managedKey != nil }) { account in
+                ForEach(server.accounts.filter { $0.managedKey?.requiresAgent == true }) { account in
                     Button(account.username) {
                         keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: account.id, unlock: true)
                     }

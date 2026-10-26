@@ -12,6 +12,18 @@ struct SSHKeySetup: Identifiable, Sendable {
     let isUnlock: Bool
 }
 
+enum SSHKeySetupProgress: Equatable, Sendable {
+    case generating, registering, verifying
+
+    var label: String {
+        switch self {
+        case .generating: return "SSH 키 생성 중…"
+        case .registering: return "서버에 공개 키 등록 중…"
+        case .verifying: return "키 인증 검증 및 적용 중…"
+        }
+    }
+}
+
 @MainActor
 public final class AppModel: ObservableObject {
     public static var defaultStoreURL: URL {
@@ -30,12 +42,15 @@ public final class AppModel: ObservableObject {
     private(set) var persistenceBlocked = false
     private let store: StateStore
     typealias CommandExecutor = @Sendable (ShellCommand, TimeInterval) async throws -> ProcessResult
+    typealias PasswordRegistrationExecutor = @Sendable (ShellCommand, String, TimeInterval) async throws -> Void
     private let execute: CommandExecutor
+    private let registerPassword: PasswordRegistrationExecutor
     private let agentEnvironment: [String: String]
     private struct AccountKey: Hashable { let serverID: UUID; let accountID: UUID }
     private var pausedAuthentication: [AccountKey: SSHConnectionFailure] = [:]
     private var activeAuthentication: [AccountKey: UUID] = [:]
     private var keySetupTokens: [AccountKey: UUID] = [:]
+    private var automaticKeySetupTasks: [UUID: Task<Void, Error>] = [:]
     private var verifyingKeySetups: Set<UUID> = []
     private var previous: [UUID: RawMetrics] = [:]
     private var lastAttempts: [UUID: Date] = [:]
@@ -72,9 +87,13 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    init(demo: Bool, storeURL: URL?, agentEnvironment: [String: String] = ProcessInfo.processInfo.environment, execute: @escaping CommandExecutor) {
+    init(demo: Bool, storeURL: URL?, agentEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+         registerPassword: @escaping PasswordRegistrationExecutor = { command, password, timeout in
+             try await SSHPasswordRegistrationRunner().run(command, password: password, timeout: timeout)
+         }, execute: @escaping CommandExecutor) {
         self.isDemo = demo
         self.execute = execute
+        self.registerPassword = registerPassword
         self.agentEnvironment = agentEnvironment
         self.storeURL = storeURL ?? Self.defaultStoreURL
         self.store = StateStore(url: self.storeURL)
@@ -236,6 +255,68 @@ public final class AppModel: ObservableObject {
         lastAttempts[id] = nil
     }
 
+    func automaticallySetUpSSHKey(serverID: UUID, accountID: UUID, password: String,
+                                 progress: @escaping (SSHKeySetupProgress) -> Void = { _ in }) async throws {
+        guard !password.isEmpty, password.utf8.count <= 1023,
+              !password.contains(where: { $0 == "\0" || $0 == "\n" || $0 == "\r" }) else {
+            throw UIError.message("비밀번호는 1~1023바이트이며 줄바꿈과 NUL 문자를 포함할 수 없습니다.")
+        }
+        guard !isDemo, !persistenceBlocked,
+              let server = workspace.servers.first(where: { $0.id == serverID && $0.kind == .ssh }),
+              let account = server.accounts.first(where: { $0.id == accountID }) else {
+            throw UIError.message("저장된 SSH 서버와 계정을 선택하세요. 데모에서는 키를 설정하지 않습니다.")
+        }
+        let key = AccountKey(serverID: serverID, accountID: accountID)
+        guard keySetupTokens[key] == nil, activeAuthentication[key] == nil else {
+            throw UIError.message("이 계정의 인증 작업이 진행 중입니다. 완료 후 다시 시도하세요.")
+        }
+        let token = UUID()
+        keySetupTokens[key] = token
+        activeAuthentication[key] = token
+        let operation = Task { @MainActor in
+            try await performAutomaticSSHKeySetup(token: token, server: server, account: account, password: password, progress: progress)
+        }
+        automaticKeySetupTasks[token] = operation
+        defer {
+            automaticKeySetupTasks[token] = nil
+            cancelSSHKeySetup(token)
+            if activeAuthentication[key] == token { activeAuthentication[key] = nil }
+        }
+        try await withTaskCancellationHandler {
+            try await operation.value
+        } onCancel: { operation.cancel() }
+    }
+
+    private func performAutomaticSSHKeySetup(token: UUID, server: ServerProfile, account: SSHAccount,
+                                             password: String, progress: (SSHKeySetupProgress) -> Void) async throws {
+        try requireCurrentKeySetup(token, server: server, account: account)
+        let target = try await SSHConnectionResolver.resolveTarget(server: server, account: account, execute: execute)
+        try requireCurrentKeySetup(token, server: server, account: account)
+        let reference = SSHManagedKeyReference(target: target, requiresAgent: false)
+        let generation = try SSHManagedKeys.automaticKeyGenerationCommand(reference: reference)
+        progress(.generating)
+        try requireCurrentKeySetup(token, server: server, account: account)
+        let result = try await execute(generation, 10)
+        try requireCurrentKeySetup(token, server: server, account: account)
+        guard result.exitCode == 0 else {
+            throw UIError.message("SSH 키를 생성하지 못했습니다. 기존 키는 유지됩니다. 저장 위치와 파일 권한을 확인하세요.")
+        }
+        let currentTarget = try await SSHConnectionResolver.resolveTarget(server: server, account: account, execute: execute)
+        try requireCurrentKeySetup(token, server: server, account: account)
+        guard currentTarget == target else {
+            throw UIError.message("SSH 별칭의 연결 대상이 바뀌었습니다. 설정을 닫고 다시 시작하세요.")
+        }
+        let registration = try SSHManagedKeys.passwordRegistrationCommand(reference: reference, publicKey: result.stdout)
+        progress(.registering)
+        try requireCurrentKeySetup(token, server: server, account: account)
+        try await registerPassword(registration, password, 30)
+        try requireCurrentKeySetup(token, server: server, account: account)
+        progress(.verifying)
+        try requireCurrentKeySetup(token, server: server, account: account)
+        try await verifyAndApplySSHKeySetup(SSHKeySetup(id: token, server: server, account: account,
+                                                      reference: reference, agentSocket: "", command: generation, isUnlock: false))
+    }
+
     func prepareSSHKeySetup(serverID: UUID, accountID: UUID, unlock: Bool = false) async throws -> SSHKeySetup {
         guard !isDemo, !persistenceBlocked,
               let server = workspace.servers.first(where: { $0.id == serverID && $0.kind == .ssh }),
@@ -276,7 +357,9 @@ public final class AppModel: ObservableObject {
     func cancelSSHKeySetup(_ id: UUID) {
         guard let key = keySetupTokens.first(where: { $0.value == id })?.key else { return }
         keySetupTokens[key] = nil
-        if activeAuthentication[key] == id { activeAuthentication[key] = nil }
+        automaticKeySetupTasks[id]?.cancel()
+        // The password transport owns this slot until its cancelled process has unwound.
+        if automaticKeySetupTasks[id] == nil, activeAuthentication[key] == id { activeAuthentication[key] = nil }
     }
 
     func verifyAndApplySSHKeySetup(_ setup: SSHKeySetup) async throws {
@@ -287,14 +370,24 @@ public final class AppModel: ObservableObject {
         let target = try await SSHConnectionResolver.resolveTarget(server: setup.server, account: setup.account, execute: execute)
         try requireCurrentKeySetup(setup.id, server: setup.server, account: setup.account)
         guard target == setup.reference.target else { throw UIError.message("SSH 별칭의 연결 대상이 바뀌었습니다. 설정을 닫고 다시 시작하세요.") }
-        _ = try await availableSSHAgent(socket: setup.agentSocket)
-        try requireCurrentKeySetup(setup.id, server: setup.server, account: setup.account)
+        if setup.reference.requiresAgent {
+            _ = try await availableSSHAgent(socket: setup.agentSocket)
+            try requireCurrentKeySetup(setup.id, server: setup.server, account: setup.account)
+        }
         let command = try SSHManagedKeys.verificationCommand(server: setup.server, account: setup.account,
                                                             reference: setup.reference, agentSocket: setup.agentSocket)
         let result = try await execute(command, 10)
         try requireCurrentKeySetup(setup.id, server: setup.server, account: setup.account)
         guard result.exitCode == 0 else {
-            throw UIError.message("키 인증 검증 실패 (\(result.exitCode)). 터미널에서 키 생성·등록·잠금 해제를 완료한 뒤 다시 검증하세요.\n\(String(result.stderr.prefix(600)))")
+            if SSHConnectionFailure.classify(exitCode: result.exitCode, stderr: result.stderr) == .hostKey {
+                throw UIError.message("서버 신원을 확인할 수 없습니다. 일반 터미널에서 SSH 대상과 호스트 키를 확인하고 신뢰한 뒤 다시 시도하세요. 기존 인증은 유지됩니다.")
+            }
+            throw UIError.message("키 인증 검증 실패 (\(result.exitCode)). 서버의 공개 키 등록과 SSH 연결 대상을 확인하세요. 기존 인증은 유지됩니다.")
+        }
+        let verifiedTarget = try await SSHConnectionResolver.resolveTarget(server: setup.server, account: setup.account, execute: execute)
+        try requireCurrentKeySetup(setup.id, server: setup.server, account: setup.account)
+        guard verifiedTarget == setup.reference.target else {
+            throw UIError.message("SSH 별칭의 연결 대상이 바뀌었습니다. 설정을 닫고 다시 시작하세요.")
         }
         var profile = setup.server
         guard let index = profile.accounts.firstIndex(where: { $0.id == setup.account.id }) else { return }
@@ -302,7 +395,7 @@ public final class AppModel: ObservableObject {
         profile.accounts[index].authMethod = .managedKey
         // Keep existing terminal surfaces connected while the verified key becomes active.
         try commitProfile(profile, disconnectTabs: false)
-        cancelSSHKeySetup(setup.id)
+        if automaticKeySetupTasks[setup.id] == nil { cancelSSHKeySetup(setup.id) }
         pausedAuthentication[AccountKey(serverID: profile.id, accountID: setup.account.id)] = nil
         collectionErrors[profile.id] = nil
         lastAttempts[profile.id] = nil
@@ -340,6 +433,7 @@ public final class AppModel: ObservableObject {
         let target = try await SSHConnectionResolver.resolveTarget(server: server, account: account, execute: execute)
         guard !Task.isCancelled, workspace.servers.contains(server), isCurrent() else { throw CancellationError() }
         guard target == reference.target else { throw UIError.message("SSH 별칭의 연결 대상이 바뀌었습니다. SSH 키 설정을 다시 진행하세요.") }
+        if !reference.requiresAgent { return "" }
         return try await availableSSHAgent()
     }
 

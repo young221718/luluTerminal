@@ -55,7 +55,7 @@ extension AppModelTests {
         let loaded = AppModel(demo: false, storeURL: url)
         #expect(loaded.workspace.servers.first { $0.id == profile.id }?.accounts == saved.accounts)
         let commands = await fixture.commands
-        let verification = try #require(commands.last)
+        let verification = try #require(commands.last { $0.arguments.last == "true" })
         #expect(verification.arguments.last == "true")
         #expect(verification.environment["SSH_AUTH_SOCK"] == "/tmp/fixture-agent")
     }

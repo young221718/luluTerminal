@@ -77,7 +77,7 @@ struct ProfileEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text(isNew ? "서버 추가" : "서버 편집").font(.title2.weight(.semibold))
-            Text("서버 비밀번호는 저장하지 않습니다. 서버를 저장한 뒤 ‘SSH 키 설정’에서 키를 생성하고, 최초 등록에 필요한 인증은 터미널에서 진행하세요.").font(.caption).foregroundStyle(appearance.colors.muted)
+            Text("서버를 저장한 뒤 ‘SSH 키 설정’에서 비밀번호를 한 번 입력하면 키 생성·등록·검증을 자동으로 완료합니다. 비밀번호는 저장하지 않습니다.").font(.caption).foregroundStyle(appearance.colors.muted)
             if !isNew {
                 Text("저장하면 이 서버의 앱 연결은 모두 해제됩니다. 원격 작업은 유지됩니다.")
                     .font(.caption).foregroundStyle(appearance.colors.muted)
@@ -109,7 +109,9 @@ struct ProfileEditor: View {
                                 Text("계정 이름을 변경하면 새 계정으로 저장되고 관리 키 연결이 해제됩니다. 앱에서 설정한 키를 사용하려면 저장 후 ‘SSH 키 설정’을 다시 진행하세요. 기존 SSH 키 파일은 유지됩니다.")
                                     .font(.caption).foregroundStyle(appearance.colors.muted)
                             } else if account.authMethod == .managedKey {
-                                Text("설정한 키를 사용합니다. 키 암호가 필요하면 서버 메뉴의 ‘SSH 키 잠금 해제’를 선택하세요. 연결 대상을 바꾸려면 먼저 ‘SSH 키·기존 설정’으로 저장한 뒤 새 키를 설정하세요.")
+                                Text(account.managedKey?.requiresAgent == true
+                                     ? "설정한 키를 사용합니다. 키 암호가 필요하면 서버 메뉴의 ‘SSH 키 잠금 해제’를 선택하세요. 연결 대상을 바꾸려면 먼저 ‘SSH 키·기존 설정’으로 저장한 뒤 새 키를 설정하세요."
+                                     : "이 Mac에 저장한 키로 자동 인증합니다. 연결 대상을 바꾸려면 먼저 ‘SSH 키·기존 설정’으로 저장한 뒤 새 키를 설정하세요.")
                                     .font(.caption).foregroundStyle(appearance.colors.muted)
                             }
                         }.padding(.vertical, 4)

@@ -27,6 +27,8 @@ INFRA_CORE_ONLY 명령은 Core만 검사하므로 전체 검증을 대신하지 
 | InfraCoreTests / ProcessRunnerTests | MON-05; stdout/stderr·stdin·출력 상한·timeout·취소·프로세스 종료 |
 | InfraCoreTests / SSHConnectionTests | SSH-01·02·03·04; legacy password JSON 변환·identity 보존·credential 메타데이터 제거·system SSH 정책 |
 | InfraCoreTests / SSHManagedKeysTests | KEY-01·02·03·04, SSH-04; 지정 키·agent·등록 보존·임시 실제 키 fixture·Keychain/askpass 금지 |
+| InfraCoreTests / SSHAutomaticKeyTests | KEY-01·03·04; 실제 암호 없는 키 생성·권한·기존 경로/심볼릭 링크 보존·기존 JSON 호환·agent 없는 명령 |
+| InfraCoreTests / SSHPasswordRegistrationTests | KEY-05; 분리된 인증 PTY·분할 프롬프트·원격 출력 위장·비밀값 전달 경계·입력 제한·취소/timeout·프로세스/FD 정리 |
 | InfraCoreTests / SSHConnectionFailureTests | SSH-06; 네트워크·인증·호스트키·미분류 오류 구분 |
 | InfraTerminalUITests / AppModelTests | 아래 책임별 파일 참조 |
 | InfraTerminalUITests / AppearancePreferencesTests | UI-04; 기본 외관·저장 |
@@ -34,6 +36,7 @@ INFRA_CORE_ONLY 명령은 Core만 검사하므로 전체 검증을 대신하지 
 | InfraTerminalUITests / MonitoringPreferencesTests | MON-01, UI-01·03; 설정 저장·터미널 보존 |
 | InfraTerminalUITests / LocalMacTests | LOCAL-01·02, DEMO-01; 초기화·로드·연결·수집·재실행 |
 | InfraTerminalUITests / ProfileEditorTests | WS-05·06, SSH-05; 계정 변경·삭제 영향도, 탭 수, native 기존 계정 입력 가능, 비밀번호 입력 필드 제거 |
+| InfraTerminalUITests / SSHKeySetupViewTests | SSH-05; 일회성 보안 입력 필드·포커스·입력·자동 설정 화면 |
 | InfraTerminalUITests / HexColorInputTests | UI-04; 색 입력 검증 |
 | InfraTerminalUITests / PanelLayoutTests | UI-03; 좁은 창·드래그·접기·복원 |
 | InfraTerminalUITests / ResourceInterpolationTests | UI-06; 보간 시간·중간 숫자·미측정 |
@@ -55,6 +58,7 @@ INFRA_CORE_ONLY 명령은 Core만 검사하므로 전체 검증을 대신하지 
 | AppModelTests.swift | 저장 상태·계정 identity·탭·세션 재접속 |
 | AccountManagementTests.swift | WS-05·06, LOCAL-01; 계정 이름 변경·키 바인딩 분리·계정 삭제·서버 삭제·모니터링/선택 정합성·저장 실패 보존·진행 중 연결/수집/키 설정 무효화 |
 | AppModelAuthenticationMigrationTests.swift | SSH-02·03·05; legacy password JSON 변환·identity와 휴면 관리 키 메타데이터 보존·저장 시 credential 제거·수동 터미널 fallback·원자적 저장 실패·인증 경합·취소 |
+| AppModelAutomaticKeyTests.swift | KEY-01·03·05; 자동 순서·실패/저장 실패·직전 대상 재확인·취소·변경·삭제·비밀번호 미직렬화·기존 연결 보존 |
 | AppModelManagedKeyTests.swift | KEY-01·02·03·04; 관리 키 활성화·취소·stale 대상·agent·모니터링 |
 | AppModelMonitoringTests.swift | 수집 슬롯·중복 방지·기아 방지·이력 무효화·unknown |
 | AppModelConnectionRecoveryTests.swift | 실패 분류·정책·무인 기존 세션 연결·경유 설정 제외·수동 재시도·취소/편집/닫기/비활성화·대기 탭 보호 |
@@ -72,6 +76,6 @@ fixture는 실제로 공유되는 범위에서만 internal로 열고 도메인 r
 
 ## 남은 검사 공백
 
-관리 키 검증 응답이 지연되는 동안 취소, 검증 성공 직후 상태 저장 실패, 입력 SSH 별칭은 같지만 해석 대상이 바뀌는 경우, 상속 socket이 없어 launchctl에서 agent를 찾는 경우를 후속 보강 후보로 남긴다. 현재 검사로 모두 검증됐다고 주장하지 않는다.
+자동 설정의 지연 중 취소·검증 후 저장 실패·별칭 대상 변경은 합성 실행기로 검사한다. 실제 NAS의 password 정책·호스트 신뢰·홈 권한·공개 키 허용과 최종 자원 수집은 사용자 직접 인증 후 별도 확인한다. 기존 암호화 키에서 상속 socket이 없어 launchctl에서 agent를 찾는 환경과 VoiceOver·다양한 IME는 전체 실환경 수락이 끝난 것으로 주장하지 않는다.
 
 Ansible 개발은 2026-10-23 사용자 결정으로 취소됐다. [이전 설계의 수락 행렬](ANSIBLE_DESIGN.md#수락-검사-계획)은 이력이며 활성 검사 TODO가 아니다. Ansible 검사는 구현·실행하지 않으며 현재 자동 검사 범위에 포함하지 않는다.

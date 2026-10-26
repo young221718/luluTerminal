@@ -15,7 +15,8 @@ let package = Package(
         .package(url: "https://github.com/Lakr233/libghostty-spm.git", revision: "42bacd1339f323a693ddbca779295f4f77e5a697")
     ],
     targets: (bridgeOnly ? [] : [
-        .target(name: "InfraCore"),
+        .target(name: "InfraSSHPTY"),
+        .target(name: "InfraCore", dependencies: ["InfraSSHPTY"]),
         .testTarget(name: "InfraCoreTests", dependencies: ["InfraCore"])
     ]) + (coreOnly ? [] : [
         .target(name: "TerminalBridge", dependencies: [.product(name: "GhosttyTerminal", package: "libghostty-spm")]),

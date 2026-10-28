@@ -56,12 +56,13 @@ extension AppModelTests {
         model.cancelSSHKeySetup(setup.id)
     }
 
-    @Test(arguments: ["resolution", "generation", "registration-target", "registration", "verification-target", "verification", "apply-target"])
-    func cancellingAutomaticSetupCannotApplyItsKey(suspendedStage: String) async throws {
+    @Test(arguments: ["resolution", "generation", "registration-target", "registration", "verification-target", "verification", "apply-target"], [false, true])
+    func cancellingAutomaticSetupCannotApplyItsKey(suspendedStage: String, pending: Bool) async throws {
         let fixture = AutomaticKeyFixture(suspendedStage: suspendedStage)
         let url = temporaryURL()
         let model = automaticModel(fixture, url: url)
-        let profile = server()
+        var profile = server()
+        if pending { profile.accounts[0].authMethod = .pendingKey }
         try model.saveProfile(profile)
         let before = try Data(contentsOf: url)
         let operation = Task { try await model.automaticallySetUpSSHKey(serverID: profile.id, accountID: profile.accounts[0].id, password: "synthetic-secret-42") }
@@ -71,6 +72,7 @@ extension AppModelTests {
         await #expect(throws: (any Error).self) { try await operation.value }
         #expect(model.workspace.servers.contains(profile))
         #expect(try Data(contentsOf: url) == before)
+        if pending { #expect(!model.dueServerIDs(now: Date()).contains(profile.id)) }
         if ["resolution", "generation", "registration-target"].contains(suspendedStage) { #expect(await fixture.registration == nil) }
     }
 
@@ -182,11 +184,12 @@ extension AppModelTests {
         await #expect(throws: (any Error).self) { try await operation.value }
     }
 
-    @Test func automaticSetupSaveFailurePreservesExistingAuthentication() async throws {
+    @Test(arguments: [false, true]) func automaticSetupSaveFailurePreservesExistingAuthentication(pending: Bool) async throws {
         let fixture = AutomaticKeyFixture(suspendedStage: "verification")
         let url = temporaryURL()
         let model = automaticModel(fixture, url: url)
-        let profile = server()
+        var profile = server()
+        if pending { profile.accounts[0].authMethod = .pendingKey }
         try model.saveProfile(profile)
         let operation = Task { try await model.automaticallySetUpSSHKey(serverID: profile.id, accountID: profile.accounts[0].id, password: "synthetic-secret-42") }
         try await waitForAutomaticFixture(fixture)
@@ -209,6 +212,30 @@ extension AppModelTests {
             try await model.automaticallySetUpSSHKey(serverID: profile.id, accountID: profile.accounts[0].id, password: password)
         }
         #expect(await fixture.commands.isEmpty)
+    }
+
+    @Test(arguments: ["success", "generation", "registration", "verification"])
+    func pendingKeyOnlyBecomesConnectableAfterSuccessfulEnrollment(stage: String) async throws {
+        let fixture = AutomaticKeyFixture(failingStage: stage == "success" ? nil : stage)
+        let url = temporaryURL()
+        let model = automaticModel(fixture, url: url)
+        var profile = server()
+        profile.accounts[0].authMethod = .pendingKey
+        try model.saveProfile(profile)
+        if stage == "success" {
+            try await model.automaticallySetUpSSHKey(serverID: profile.id, accountID: profile.accounts[0].id, password: "synthetic-secret-42")
+            let saved = try #require(model.workspace.servers.first { $0.id == profile.id })
+            #expect(saved.accounts[0].authMethod == .managedKey)
+            #expect(saved.accounts[0].managedKey?.requiresAgent == false)
+            #expect(model.dueServerIDs(now: Date()).contains(profile.id))
+        } else {
+            await #expect(throws: (any Error).self) {
+                try await model.automaticallySetUpSSHKey(serverID: profile.id, accountID: profile.accounts[0].id, password: "synthetic-secret-42")
+            }
+            #expect(model.workspace.servers.contains(profile))
+            #expect(try StateStore(url: url).load()?.servers.contains(profile) == true)
+            #expect(!model.dueServerIDs(now: Date()).contains(profile.id))
+        }
     }
 
     private func automaticModel(_ fixture: AutomaticKeyFixture, url: URL) -> AppModel {

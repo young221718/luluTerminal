@@ -4,6 +4,12 @@ import Foundation
 
 let coreOnly = ProcessInfo.processInfo.environment["INFRA_CORE_ONLY"] == "1"
 let bridgeOnly = ProcessInfo.processInfo.environment["INFRA_BRIDGE_ONLY"] == "1"
+let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+let localGhostty = ProcessInfo.processInfo.environment["LULU_GHOSTTY_PACKAGE"] ?? packageRoot.appendingPathComponent(".cache/ghostty14/libghostty-spm").path
+if !coreOnly && !FileManager.default.fileExists(atPath: localGhostty + "/BinaryTarget/GhosttyKit.xcframework/Info.plist") {
+    fatalError("Ghostty 1.4 is not prepared. Run bash scripts/prepare-ghostty14.sh .cache/ghostty14 /path/to/zig-0.17.0; see docs/GHOSTTY_BUILD.md.")
+}
+let ghosttyDependency: Package.Dependency = .package(name: "libghostty-spm", path: localGhostty)
 
 let package = Package(
     name: "InfraTerminal",
@@ -12,7 +18,7 @@ let package = Package(
         .executable(name: "InfraTerminal", targets: ["InfraTerminalApp"])
     ]),
     dependencies: coreOnly ? [] : [
-        .package(url: "https://github.com/Lakr233/libghostty-spm.git", revision: "42bacd1339f323a693ddbca779295f4f77e5a697")
+        ghosttyDependency
     ],
     targets: (bridgeOnly ? [] : [
         .target(name: "InfraSSHPTY"),

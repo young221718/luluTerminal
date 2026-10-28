@@ -1,5 +1,7 @@
 # 오픈소스 라이선스와 고지
 
+이 문서는 Ghostty 1.4 전환 이전 원격 엔진의 고지 이력이다. 현재 기본 빌드는 [Ghostty 1.4 고지](THIRD_PARTY.ghostty14.md)를 사용한다.
+
 luluTerminal은 Ghostty 기반 터미널 엔진과 아래 오픈소스 구성 요소를 사용합니다.
 이 문서는 해당 구성 요소의 저작권·재배포 조건을 설명하며, luluTerminal 전체에 새 라이선스를 부여하지 않습니다.
 확인 기준은 `Package.resolved`와 `docs/licenses/manifest.json`이며, 마지막 검토일은 2026-10-22입니다.

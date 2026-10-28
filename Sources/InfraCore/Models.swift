@@ -16,7 +16,7 @@ public enum CoreError: Error, LocalizedError, Equatable {
 }
 
 public enum SSHAuthenticationMethod: String, Codable, Sendable {
-    case system, managedKey
+    case system, managedKey, pendingKey
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.singleValueContainer()

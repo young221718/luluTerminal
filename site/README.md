@@ -12,7 +12,7 @@ The browser demo uses fixed fictional server names, accounts and metrics. It doe
 
 ## Source and assets
 
-Product contracts were checked against the app repository's `README.md`, `docs/SPEC.md`, `docs/THIRD_PARTY.md`, `Package.swift`, and native panel/connection source on 2026-10-22. `dist/assets/app-icon.png` is copied unchanged from the app's `Resources/AppIcon.png`. The source link is the public luluTerminal repository. No installer, version, public download, Intel runtime validation or full-app MIT license is implied.
+Product contracts were checked against the app repository's `README.md`, `docs/SPEC.md`, `docs/THIRD_PARTY.ghostty14.md`, `Package.swift`, and native panel/connection source on 2026-10-28. `dist/assets/app-icon.png` is copied unchanged from the app's `Resources/AppIcon.png`. Source links point to the public luluTerminal repository. Release links target the first `v0.1.0` prerelease. The advertised Universal download contains Apple Silicon and Intel executables for macOS 14 or later, signed ad-hoc without Apple notarization. Runtime acceptance was performed on Apple Silicon; Intel hardware acceptance and a full-app MIT license are not implied. Confirm that the release and its assets are published before deploying this site update.
 
 The app is based on Ghostty. The repository notices cover Ghostty and its open-source libraries and fonts, including transitive licenses; these are not all represented as MIT. App code and owl assets currently have no separate reuse license.
 

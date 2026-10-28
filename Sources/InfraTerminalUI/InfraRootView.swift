@@ -70,7 +70,8 @@ public struct InfraRootView: View {
                     Group {
                         if let server = model.selectedServer {
                             ResourceInspector(server: server, snapshot: model.metrics[server.id], history: model.histories[server.id] ?? [],
-                                              now: model.now, interval: model.pollInterval(for: server.id), error: model.collectionErrors[server.id],
+                                              now: model.now, interval: model.pollInterval(for: server.id),
+                                              error: model.collectionErrors[server.id] ?? pendingKeyMessage(for: server),
                                               demo: model.isDemo && server.kind == .ssh)
                                 .id(server.id)
                         } else {
@@ -89,21 +90,17 @@ public struct InfraRootView: View {
         .foregroundStyle(appearance.colors.text)
         .tint(appearance.colors.accent)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                HStack(spacing: 7) {
-                    Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSApp.applicationIconImage)
-                        .resizable().scaledToFit().frame(width: 22, height: 22).accessibilityHidden(true)
-                    Text("luluTerminal").font(.system(size: 12, weight: .semibold))
-                }.fixedSize()
+            if #available(macOS 26.0, *) {
+                toolbarBrand.sharedBackgroundVisibility(.hidden)
+            } else {
+                toolbarBrand
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button { openQuickSwitcher() } label: { Label("빠른 이동", systemImage: "rectangle.and.text.magnifyingglass") }
-                    .labelStyle(.iconOnly).help("서버·탭 빠른 이동 · ⇧⌘P")
+            toolbarQuickSwitcher
+            if #available(macOS 26.0, *) {
+                // A fixed spacer keeps the two native glass controls in separate groups.
+                ToolbarSpacer(.fixed, placement: .primaryAction)
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button { openSettings() } label: { Label("설정", systemImage: "gearshape") }
-                    .labelStyle(.titleAndIcon).help("외관 · 글꼴 · 모니터링 설정")
-            }
+            toolbarSettings
         }
         .focusedSceneValue(\.terminalWorkspaceActions, TerminalWorkspaceActions(
             find: canSearch ? { openSearch() } : nil,
@@ -121,17 +118,8 @@ public struct InfraRootView: View {
                 showQuickSwitcher = false
             }
         }
-        .sheet(isPresented: $showProfile) {
-            ProfileEditor(profile: editingProfile, tabs: model.workspace.tabs.filter { $0.serverID == editingProfile?.id }, demo: model.isDemo) { profile in
-                let previousTabIDs = model.workspace.tabs.filter { $0.serverID == profile.id }.map(\.id)
-                try model.saveProfile(profile)
-                for id in previousTabIDs { terminal.disconnect(id: id) }
-            }
-            .id(editingProfile?.id)
-        }
-        .sheet(item: $keySetupRequest) { request in
-            SSHKeySetupView(model: model, request: request).id(request.id)
-        }
+        .modifier(ProfileSSHKeySheets(model: model, showProfile: $showProfile, editingProfile: editingProfile,
+                                      keySetupRequest: $keySetupRequest, disconnect: { terminal.disconnect(id: $0) }))
         .alert("서버를 삭제할까요?", isPresented: Binding(get: { deletingServer != nil }, set: { if !$0 { deletingServer = nil } }), presenting: deletingServer) { server in
             Button("취소", role: .cancel) { deletingServer = nil }
             Button("서버 삭제", role: .destructive) { deleteServer(server) }
@@ -277,19 +265,20 @@ public struct InfraRootView: View {
     }
 
     private func serverRow(_ server: ServerProfile) -> some View {
-        let active = model.tabs(for: server.id).contains { model.connections[$0.id] == .launched }
-        let checking = model.tabs(for: server.id).contains { model.connections[$0.id] == .checking }
-        let state = active ? (server.kind == .local ? "로컬 셸 열림" : "터미널 열림 · 연결 요청됨") : checking ? "연결 확인 중" : "터미널 미연결"
+        let status = ServerActivityStatus(server: server, tabs: model.workspace.tabs, connections: model.connections,
+                                          monitoringEnabled: monitoring.enabled, demo: model.isDemo,
+                                          snapshot: model.metrics[server.id], collectionError: model.collectionErrors[server.id],
+                                          now: model.now, interval: model.pollInterval(for: server.id))
         return HStack(spacing: 7) {
             Button { model.selectServer(server.id); monitoring.inspectorVisible = true } label: {
-                OwlConnectionView(active: active).frame(width: 29, height: 29)
-                    .foregroundStyle(active ? appearance.colors.text : appearance.colors.muted)
-            }.buttonStyle(.plain).help("\(server.name) · \(state) · 자원 열기")
-                .accessibilityLabel("\(server.name), \(active ? "눈 뜬" : "눈 감은") 부엉이, \(state), 자원 열기")
+                OwlConnectionView(active: status.active).frame(width: 29, height: 29)
+                    .foregroundStyle(status.active ? appearance.colors.text : appearance.colors.muted)
+            }.buttonStyle(.plain).help("\(server.name) · \(status.detail) · 자원 열기")
+                .accessibilityLabel("\(server.name), \(status.active ? "눈 뜬" : "눈 감은") 부엉이, \(status.detail), 자원 열기")
             Button { model.selectServer(server.id) } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(server.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                    Text(state).font(.system(size: 9)).foregroundStyle(appearance.colors.muted).lineLimit(1)
+                    Text(status.summary).font(.system(size: 9)).foregroundStyle(appearance.colors.muted).lineLimit(1)
                 }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
             }.buttonStyle(.plain)
         }.padding(.horizontal, 8).frame(height: 53)
@@ -441,7 +430,12 @@ public struct InfraRootView: View {
                                     keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: tab.accountID, unlock: requiresAgent)
                                 }
                             } else {
-                                Button("터미널에서 인증") { connect(tab, create: false, interactive: true) }
+                                Button("SSH 키 자동 설정") {
+                                    keySetupRequest = SSHKeySetupRequest(serverID: server.id, accountID: tab.accountID)
+                                }.disabled(model.isDemo)
+                                if model.account(for: tab)?.authMethod == .system {
+                                    Button("터미널에서 인증") { connect(tab, create: false, interactive: true) }
+                                }
                             }
                         }
                     }.font(.caption).frame(maxWidth: .infinity, alignment: .leading).padding(12).background(Color.orange.opacity(0.12))
@@ -478,6 +472,11 @@ public struct InfraRootView: View {
         Label(text, systemImage: icon).font(.caption).foregroundStyle(color).textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.vertical, 10).background(color.opacity(0.08))
     }
+    private func pendingKeyMessage(for server: ServerProfile) -> String? {
+        guard !model.isDemo, server.kind == .ssh,
+              server.accounts.contains(where: { $0.id == server.monitorAccountID && $0.authMethod == .pendingKey }) else { return nil }
+        return "SSH 키 설정이 필요합니다. 서버 메뉴에서 ‘SSH 키 설정’을 선택하세요."
+    }
     @ViewBuilder private func sshKeyActions(_ server: ServerProfile) -> some View {
         Menu("SSH 키 설정") {
             ForEach(server.accounts) { account in
@@ -494,6 +493,30 @@ public struct InfraRootView: View {
                     }
                 }
             }.disabled(model.isDemo)
+        }
+    }
+
+    private var toolbarBrand: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            HStack(spacing: 7) {
+                Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSApp.applicationIconImage)
+                    .resizable().scaledToFit().frame(width: 22, height: 22).accessibilityHidden(true)
+                Text("luluTerminal").font(.system(size: 12, weight: .semibold))
+            }.fixedSize()
+        }
+    }
+
+    private var toolbarQuickSwitcher: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button { openQuickSwitcher() } label: { Label("빠른 이동", systemImage: "rectangle.and.text.magnifyingglass") }
+                .labelStyle(.iconOnly).help("서버·탭 빠른 이동 · ⇧⌘P")
+        }
+    }
+
+    private var toolbarSettings: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button { openSettings() } label: { Label("설정", systemImage: "gearshape") }
+                .labelStyle(.titleAndIcon).help("외관 · 글꼴 · 모니터링 설정")
         }
     }
 

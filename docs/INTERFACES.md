@@ -1,12 +1,12 @@
 # 모듈 경계와 구현 진입점
 
-기준: 2026-10-26 현행 구현. [SPEC](SPEC.md)의 계약을 구현하는 코드 위치를 연결한다. 변경에 뒤처지기 쉬운 Swift 선언 전체 복제 대신 실제 선언을 정본으로 사용한다. 정리 전 선언과 기록은 [원문](history/INTERFACES-before-organization-2026-10-23.md)에 보존했다.
+기준: 2026-10-28 현행 구현. [SPEC](SPEC.md)의 계약을 구현하는 코드 위치를 연결한다. 변경에 뒤처지기 쉬운 Swift 선언 전체 복제 대신 실제 선언을 정본으로 사용한다. 정리 전 선언과 기록은 [원문](history/INTERFACES-before-organization-2026-10-23.md)에 보존했다.
 
 ## InfraCore
 
 | 책임 | 구현 | 경계 |
 | --- | --- | --- |
-| 프로필·계정·탭·상태 | [Models.swift](../Sources/InfraCore/Models.swift) | UUID identity, system/managedKey 인증, 버전 있는 Codable 상태, 누락된 kind/auth 기본값, legacy password→system 변환·credential 메타데이터 무시, 원자적 저장·손상 보존 |
+| 프로필·계정·탭·상태 | [Models.swift](../Sources/InfraCore/Models.swift) | UUID identity, system/managedKey 인증과 pendingKey 대기 상태, 버전 있는 Codable 상태, 누락된 kind/auth 기본값, legacy password→system 변환·credential 메타데이터 무시, 원자적 저장·손상 보존 |
 | 셸·SSH/tmux 명령 | [SSHCommands.swift](../Sources/InfraCore/SSHCommands.swift) | ShellCommand는 executable/arguments/standardInput/environment. shellString은 모든 인자를 인용한다. cwd나 streaming 이벤트 필드는 없다. |
 | 단기 실행 | [ProcessRunner.swift](../Sources/InfraCore/ProcessRunner.swift) | run 결과는 exitCode/stdout/stderr. 기본 timeout 8초, 합계 출력 1 MiB. 취소·timeout·출력 초과 때 프로세스 그룹 종료·직접 자식 회수. 장시간 작업 API로 사용하지 않는다. |
 | 앱 생성 키 | [SSHManagedKeys.swift](../Sources/InfraCore/SSHManagedKeys.swift) | 참조·키 경로·자동 생성/등록/검증·기존 키 unlock 명령. requiresAgent는 기존 true/신규 자동 키 false. 비밀번호는 이 명령 모델에 포함하지 않는다. |
@@ -14,7 +14,7 @@
 | 측정값 | [Metrics.swift](../Sources/InfraCore/Metrics.swift) | 비율은 0…1 Double?, nil은 unknown. 개별 DiskReading/GPUReading/NetworkRate와 기존 요약을 구분. Parser와 Calculator는 수집·화면에서 분리. |
 | 현재 Mac | [LocalMachine.swift](../Sources/InfraCore/LocalMachine.swift) | 예약 UUID, 기존 순서를 보존하는 ensureLocalMachine, 로컬 셸·CPU/RAM/마운트 수집. SSH builder는 local 거부. |
 
-SSHCommandBuilder의 terminal/probe/monitor는 managedKeyAgentSocket 및 테스트용 managedKeyRootURL을 받는다. 모든 SSH 명령은 UseKeychain=no, AddKeysToAgent=no와 SSH_ASKPASS_REQUIRE=never를 적용한다. system 터미널은 대화형 인증을 허용하고 사전 확인·모니터링은 비대화형 키·agent 인증만 허용한다. 자동 복구는 해석된 SSH 설정을 먼저 확인하고 ProxyJump·ProxyCommand·HostKeyAlias 연결을 수동 재시도로 남긴다. 비대화형 복구를 위해 기존 SSH 경로·포워딩을 제거하지 않는다.
+SSHCommandBuilder의 terminal/probe/monitor는 managedKeyAgentSocket 및 테스트용 managedKeyRootURL을 받는다. 공유 명령 경계는 pendingKey의 terminal/probe/monitor 생성을 거부한다. 모든 SSH 명령은 UseKeychain=no, AddKeysToAgent=no와 SSH_ASKPASS_REQUIRE=never를 적용한다. system 터미널은 대화형 인증을 허용하고 사전 확인·모니터링은 비대화형 키·agent 인증만 허용한다. 자동 복구는 해석된 SSH 설정을 먼저 확인하고 ProxyJump·ProxyCommand·HostKeyAlias 연결을 수동 재시도로 남긴다. 비대화형 복구를 위해 기존 SSH 경로·포워딩을 제거하지 않는다.
 
 앱에는 비밀번호 저장소·Keychain context·인증 도우미·askpass 인터페이스가 없다. 과거 password 프로필의 credential 필드는 디코딩 때 읽지 않으며 새 상태에 인코딩하지 않는다. 이 변환은 계정·탭 identity를 보존하며 과거 키체인 항목 삭제를 증명하지 않는다.
 
@@ -26,9 +26,15 @@ SSHCommandBuilder의 terminal/probe/monitor는 managedKeyAgentSocket 및 테스�
 
 [AppModel.swift](../Sources/InfraTerminalUI/AppModel.swift)는 MainActor에서 프로필·탭·저장·인증·수집을 조정한다. 실행기·상태 URL은 테스트에서 주입한다. 잘못되거나 오래된 async 결과가 최신 프로필과 세션을 바꾸지 않도록 대상과 token을 재검증한다.
 
-프로필 편집은 `saveProfile(_:)`, 서버 삭제는 `deleteServer(_:)`가 소유한다. 이름이 바뀐 계정에 새 UUID를 부여하고 이전 계정의 탭을 후보 상태에서 제거하므로 StateStore의 identity 검증을 우회하지 않는다. 후보 상태 저장 성공 뒤에만 연결·수집을 무효화하고 삭제된 참조를 정리한다. UI는 영향도 확인을 담당하며 저장 전에 기존 탭 ID를 포착해 성공 후 해당 터미널 표면을 해제한다. 삭제는 원격 명령이나 SSH 키 파일 삭제를 실행하지 않는다.
+프로필 편집은 `saveProfile(_:)`, 서버 삭제는 `deleteServer(_:)`가 소유한다. 이름이 바뀐 계정에 새 UUID를 부여하고 인증을 pendingKey로 초기화하며 이전 계정의 탭을 후보 상태에서 제거하므로 StateStore의 identity 검증을 우회하지 않는다. 후보 상태 저장 성공 뒤에만 연결·수집을 무효화하고 삭제된 참조를 정리한다. UI는 영향도 확인을 담당하며 저장 전에 기존 탭 ID를 포착해 성공 후 해당 터미널 표면을 해제한다. 삭제는 원격 명령이나 SSH 키 파일 삭제를 실행하지 않는다.
 
-managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 모두 성공해야 한다. 설정 터미널 종료 자체는 성공 신호가 아니다. automaticallySetUpSSHKey는 일회성 비밀번호와 단계 콜백을 받아 생성·등록·검증·저장을 조정하며 비밀번호를 상태에 저장하지 않는다. 최초 등록은 주입 가능한 PasswordRegistrationExecutor로 분리한다. 키 암호가 있는 기존 키는 로그인 세션 agent에서 잠금을 해제한다.
+프로필 저장 후 SSH 안내는 ProfileSSHKeySheets가 소유한다. saveProfile 성공 직후 workspace의 최종 ServerProfile을 읽으며, 이름 변경으로 교체된 UUID는 이 저장값이 정본이다. 편집 초안 ID를 SSH 설정에 사용하지 않는다. 이전 프로필과 저장값을 비교해 새 pendingKey 계정만 대기열에 넣고 편집 sheet의 onDismiss에서 설정을 시작한다. 설정 성공 후 다음 대상, 취소 후 대기열 비우기를 적용하며 비밀번호를 대기열에 보관하지 않는다. ProfileEditor는 초기 계정과 추가 계정을 명시적으로 pendingKey로 만들고 ‘새 SSH 키 자동 설정’ 고정 행을 표시한다. 기존 계정의 system·managedKey 설정은 유지한다. 취소·실패한 pendingKey는 저장된 상태로 남고 서버 메뉴에서 다시 설정한다.
+
+서버 편집 Form은 모니터링의 시간·측정값 발행과 별도 갱신 경계를 둔다. 편집 대상, 해당 서버의 탭, 데모 여부, 시트 수명에 고정된 저장 문맥을 비교하며 무관한 갱신은 내부 Form으로 전달하지 않는다. 임의의 저장 콜백이 같다고 가정하지 않는다. 입력 상태와 외관 의존성은 편집기 내부에서 계속 관찰한다. macOS 27의 grouped Form에서 부모 갱신마다 관찰 객체가 누적되는 재현 경로를 차단하기 위한 경계다.
+
+AppModel은 pendingKey의 터미널 요청에 설정 필요 상태를 표시하고, 수집 스케줄과 자동 복구 대상에서 제외한다. SSHCommandBuilder도 같은 상태를 거부하므로 UI·모델 경로 밖에서 기존 키로 우회하지 않는다. pendingKey는 JSON에 보존되어 재실행 후에도 적용된다.
+
+managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 모두 성공해야 한다. 설정 터미널 종료 자체는 성공 신호가 아니다. automaticallySetUpSSHKey는 일회성 비밀번호와 단계 콜백을 받아 생성·등록·검증·저장을 조정하며 비밀번호를 상태에 저장하지 않는다. 시도마다 새 UUID 경로에 키를 생성하고 공개 키 한 줄만 원격 목록에 추가하여 기존 키 파일·등록 키를 보존한다. 최초 등록은 주입 가능한 PasswordRegistrationExecutor로 분리한다. 키 암호가 있는 기존 키는 로그인 세션 agent에서 잠금을 해제한다.
 
 연결 복구의 모델 경계는 configureConnectionRecovery(enabled:), connectionEnvironmentInterrupted(), beginConnectionRecovery()와 prepareConnection(... automaticRecovery:)다. 중단 전 연결 의도·탭·계정·프로필·token을 재확인하며 복구 허가는 한 번만 사용한다. 닫힌 탭·로컬·데모를 제외하고 기존 세션만 확인한다. 수동 해제·닫기·프로필 변경·설정 해제 뒤 오래된 결과를 버린다. 자동 복구는 대화형 인증과 키 잠금 해제를 허용하지 않는다.
 
@@ -39,6 +45,8 @@ managedKey 활성화는 독립 검증, 최신 대상 확인, 상태 저장이 �
 | 현재 터미널 검색 | [TerminalSearchBar.swift](../Sources/InfraTerminalUI/TerminalSearchBar.swift) | Ghostty 검색 상태 표시·검색어·이전/다음·닫기와 입력 포커스. 검색 실행과 surface 수명은 TerminalHost 소유. |
 | 빠른 이동 | [QuickSwitcher.swift](../Sources/InfraTerminalUI/QuickSwitcher.swift) | QuickSwitchTarget.server(UUID)/tab(UUID), QuickSwitchItem.entries(workspace:query:). 서버 순서와 열린 탭을 유지한 토큰 AND 검색. 열린 탭이 없는 계정은 서버 행으로 찾으며 모델 변경은 onSelect 콜백에 위임. |
 | 메뉴·단축키 | [TerminalWorkspaceCommands.swift](../Sources/InfraTerminalUI/TerminalWorkspaceCommands.swift) | 활성 창의 focused actions로 ⌘F·⇧⌘P를 연결. 검색은 현재 실행 중인 탭, 빠른 이동은 서버·계정·열린 탭 대상. |
+
+사이드바의 부엉이 눈 상태는 열린 터미널 또는 최근 정상 자원 수집을 표시한다. 자원 활동 판단은 기존 MetricsSnapshot.isStale(now:interval:)와 수집 설정·오류를 사용하고 새 타이머나 SSH 연결을 만들지 않는다. 수집 중인 프로세스 유무는 각 poll 사이의 깜빡임을 만들 수 있으므로 활동 기준으로 사용하지 않는다.
 
 [InfraRootView.swift](../Sources/InfraTerminalUI/InfraRootView.swift)는 선택한 로컬 셸을 열 수 있지만 원격 새 세션은 명시적 동작에서만 만든다. 빠른 이동은 기존 selectServer/selectTab만 호출하며 UUID·연결·열린 surface를 유지한다. 복구 설정·이벤트를 연결하고 modal 표시 중에는 복구를 미룬다. 외관·모니터링·연결 복구 설정은 workspace JSON과 별도다. 비활성 Ansible 메뉴·안내는 제거했다. [ResourceInterpolation.swift](../Sources/InfraTerminalUI/ResourceInterpolation.swift)는 표시만 보간하며 새 수집 타이머를 만들지 않는다.
 

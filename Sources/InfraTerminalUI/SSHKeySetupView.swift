@@ -14,6 +14,7 @@ struct SSHKeySetupView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: AppModel
     let request: SSHKeySetupRequest
+    var onComplete: () -> Void = {}
     @StateObject private var terminal = TerminalHost()
     @ViewState private var setup: SSHKeySetup?
     @ViewState private var password = ""
@@ -116,7 +117,7 @@ struct SSHKeySetupView: View {
             do {
                 try await model.automaticallySetUpSSHKey(serverID: request.serverID, accountID: request.accountID,
                                                         password: submittedPassword) { progress = $0 }
-                if !Task.isCancelled { dismiss() }
+                if !Task.isCancelled { onComplete(); dismiss() }
             } catch {
                 if !Task.isCancelled {
                     self.error = (error as? SSHPasswordRegistrationError) == .hostKeyFailed

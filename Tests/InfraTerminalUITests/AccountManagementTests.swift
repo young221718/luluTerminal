@@ -38,7 +38,7 @@ extension AppModelTests {
         try model.saveProfile(profile)
         let saved = try #require(model.selectedServer)
         #expect(saved.accounts[0].id != profile.accounts[0].id)
-        #expect(saved.accounts[0].authMethod == .system)
+        #expect(saved.accounts[0].authMethod == .pendingKey)
         #expect(saved.accounts[0].managedKey == nil)
         #expect(saved.accounts[1] == retained)
         #expect(saved.monitorAccountID == saved.accounts[0].id)

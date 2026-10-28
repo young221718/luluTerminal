@@ -1,0 +1,639 @@
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index d541297..5459e06 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -95,7 +95,7 @@ jobs:
+         # build.zig.zon; a version drift fails every target at once.
+         uses: mlugg/setup-zig@v2
+         with:
+-          version: 0.16.0
++          version: 0.17.0
+ 
+       - name: Clone Ghostty
+         run: |
+diff --git a/.github/workflows/source-build.yml b/.github/workflows/source-build.yml
+index e159a8c..173cc6f 100644
+--- a/.github/workflows/source-build.yml
++++ b/.github/workflows/source-build.yml
+@@ -51,7 +51,7 @@ jobs:
+       - name: Setup Zig
+         uses: mlugg/setup-zig@v2
+         with:
+-          version: 0.16.0
++          version: 0.17.0
+ 
+       - name: Clone Ghostty
+         run: |
+diff --git a/Ghostty.build b/Ghostty.build
+index 00750ed..d00491f 100644
+--- a/Ghostty.build
++++ b/Ghostty.build
+@@ -1 +1 @@
+-3
++1
+diff --git a/Ghostty.ref b/Ghostty.ref
+index becba24..a3b3f06 100644
+--- a/Ghostty.ref
++++ b/Ghostty.ref
+@@ -1 +1 @@
+-1e9e14af5df14211892f5fc15fd21a49c7d94868
++83fb95624b0439ee660c2679b43b38c8b63769cd
+diff --git a/Patches/ghostty/0002-host-managed-io.patch b/Patches/ghostty/0002-host-managed-io.patch
+index 866c7b3..4a25383 100644
+--- a/Patches/ghostty/0002-host-managed-io.patch
++++ b/Patches/ghostty/0002-host-managed-io.patch
+@@ -1,5 +1,5 @@
+ diff --git a/include/ghostty.h b/include/ghostty.h
+-index 518af3ff2..3a27e6b16 100644
++index 9a12b9c..f1e7be8 100644
+ --- a/include/ghostty.h
+ +++ b/include/ghostty.h
+ @@ -505,10 +505,26 @@ typedef enum {
+@@ -29,7 +29,7 @@ index 518af3ff2..3a27e6b16 100644
+    double scale_factor;
+    float font_size;
+    const char* working_directory;
+-@@ -1176,6 +1192,8 @@ GHOSTTY_API ghostty_surface_config_s ghostty_surface_inherited_config(ghostty_su
++@@ -1184,6 +1200,8 @@ GHOSTTY_API ghostty_surface_config_s ghostty_surface_inherited_config(ghostty_su
+  GHOSTTY_API void ghostty_surface_update_config(ghostty_surface_t, ghostty_config_t);
+  GHOSTTY_API bool ghostty_surface_needs_confirm_quit(ghostty_surface_t);
+  GHOSTTY_API bool ghostty_surface_process_exited(ghostty_surface_t);
+@@ -39,41 +39,54 @@ index 518af3ff2..3a27e6b16 100644
+  GHOSTTY_API void ghostty_surface_draw(ghostty_surface_t);
+  GHOSTTY_API void ghostty_surface_set_content_scale(ghostty_surface_t, double, double);
+ diff --git a/src/Surface.zig b/src/Surface.zig
+-index 8eddc14c8..34450afb6 100644
++index 369bb23..2722d98 100644
+ --- a/src/Surface.zig
+ +++ b/src/Surface.zig
+-@@ -639,39 +639,47 @@ pub fn init(
++@@ -662,43 +662,54 @@ pub fn init(
+      // This separate block ({}) is important because our errdefers must
+      // be scoped here to be valid.
+      {
+--        var env = rt_surface.defaultTermioEnv() catch |err| env: {
+--            // If an error occurs, we don't want to block surface startup.
+--            log.warn("error getting env map for surface err={}", .{err});
+--            break :env global.environMap() catch std.process.Environ.Map.init(alloc);
+--        };
+--        errdefer env.deinit();
+-+        const backend: termio.Backend = switch (rt_surface.termioBackend()) {
++-        // Exec.init takes ownership of the env even if it fails, so the
++-        // errdefer for it must not reach past the call.
++-        const env = termio_env: {
++-            var env = rt_surface.defaultTermioEnv() catch |err| env: {
++-                // If an error occurs, we don't want to block surface startup.
++-                log.warn("error getting env map for surface err={}", .{err});
++-                break :env global.environMap() catch std.process.Environ.Map.init(alloc);
++-            };
++-            errdefer env.deinit();
+++        var backend: termio.Backend = switch (rt_surface.termioBackend()) {
+ +            .exec => backend: {
+-+                var env = rt_surface.defaultTermioEnv() catch |err| env: {
+-+                    log.warn("error getting env map for surface err={}", .{err});
+-+                    break :env global.environMap() catch std.process.Environ.Map.init(alloc);
+-+                };
+-+                errdefer env.deinit();
+++                // Exec.init takes ownership of the env even if it fails, so the
+++                // errdefer for it must not reach past the call.
+++                const env = termio_env: {
+++                    var env = rt_surface.defaultTermioEnv() catch |err| env: {
+++                        // If an error occurs, we don't want to block surface startup.
+++                        log.warn("error getting env map for surface err={}", .{err});
+++                        break :env global.environMap() catch std.process.Environ.Map.init(alloc);
+++                    };
+++                    errdefer env.deinit();
+  
+--        // don't leak GHOSTTY_LOG to any subprocesses
+--        _ = env.orderedRemove("GHOSTTY_LOG");
+-+                _ = env.orderedRemove("GHOSTTY_LOG");
++-            // don't leak GHOSTTY_LOG to any subprocesses
++-            _ = env.orderedRemove("GHOSTTY_LOG");
+++                    // don't leak GHOSTTY_LOG to any subprocesses
+++                    _ = env.orderedRemove("GHOSTTY_LOG");
+  
+--        var buf: [18]u8 = undefined;
+--        try env.put(
+--            "GHOSTTY_SURFACE_ID",
+--            std.fmt.bufPrint(&buf, "0x{x:0>16}", .{self.id}) catch unreachable,
+--        );
+-+                var buf: [18]u8 = undefined;
+-+                try env.put(
+-+                    "GHOSTTY_SURFACE_ID",
+-+                    std.fmt.bufPrint(&buf, "0x{x:0>16}", .{self.id}) catch unreachable,
+-+                );
++-            var buf: [18]u8 = undefined;
++-            try env.put(
++-                "GHOSTTY_SURFACE_ID",
++-                std.mem.print(&buf, "0x{x:0>16}", .{self.id}) catch unreachable,
++-            );
+++                    var buf: [18]u8 = undefined;
+++                    try env.put(
+++                        "GHOSTTY_SURFACE_ID",
+++                        std.mem.print(&buf, "0x{x:0>16}", .{self.id}) catch unreachable,
+++                    );
++ 
++-            break :termio_env env;
++-        };
+++                    break :termio_env env;
+++                };
+  
+ -        // Initialize our IO backend
+ -        var io_exec = try termio.Exec.init(alloc, .{
+@@ -90,7 +103,8 @@ index 8eddc14c8..34450afb6 100644
+ -            .rt_post_fork_info = .init(config),
+ -        });
+ -        errdefer io_exec.deinit();
+-+                var io_exec = try termio.Exec.init(alloc, .{
+++                // Initialize our IO backend
+++                const io_exec = try termio.Exec.init(alloc, .{
+ +                    .command = command,
+ +                    .env = env,
+ +                    .env_override = config.env,
+@@ -103,32 +117,29 @@ index 8eddc14c8..34450afb6 100644
+ +                    .rt_pre_exec_info = .init(config),
+ +                    .rt_post_fork_info = .init(config),
+ +                });
+-+                errdefer io_exec.deinit();
+-+
+ +                break :backend .{ .exec = io_exec };
+ +            },
+-+
+ +            .host_managed => .{
+ +                .host_managed = termio.HostManaged.init(
+ +                    try rt_surface.hostManagedConfig(),
+ +                ),
+ +            },
+ +        };
+++        // Termio.init takes ownership only on success.
+++        errdefer backend.deinit();
+  
+--        // Initialize our IO mailbox
++         // Initialize our IO mailbox
+          var io_mailbox = try termio.Mailbox.initSPSC(alloc);
+-         errdefer io_mailbox.deinit(alloc);
+- 
+-@@ -679,7 +687,7 @@ pub fn init(
++@@ -712,7 +723,7 @@ pub fn init(
+              .size = size,
+              .full_config = config,
+-             .config = try termio.Termio.DerivedConfig.init(alloc, config),
++             .config = io_config,
+ -            .backend = .{ .exec = io_exec },
+ +            .backend = backend,
+              .mailbox = io_mailbox,
+              .renderer_state = &self.renderer_state,
+              .renderer_wakeup = render_thread.wakeup,
+-@@ -1336,9 +1344,11 @@ fn childExitedAbnormally(
++@@ -1384,9 +1395,10 @@ fn childExitedAbnormally(
+      const alloc = arena.allocator();
+  
+      // Build up our command for the error message
+@@ -139,12 +150,11 @@ index 8eddc14c8..34450afb6 100644
+ +        .exec => |*exec| try std.mem.join(alloc, " ", exec.subprocess.args),
+ +        .host_managed => try alloc.dupe(u8, "host-managed session"),
+ +    };
+-+    defer alloc.free(command);
+-     const runtime_str = try std.fmt.allocPrint(alloc, "{d} ms", .{info.runtime_ms});
++     const runtime_str = try alloc.print("{d} ms", .{info.runtime_ms});
+  
+      self.renderer_state.mutex.lockUncancelable(global.io());
+ diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+-index 525bc856d..428cc21a4 100644
++index 697f0a7..0d04627 100644
+ --- a/src/apprt/embedded.zig
+ +++ b/src/apprt/embedded.zig
+ @@ -16,6 +16,7 @@ const input = @import("../input.zig");
+@@ -236,7 +246,7 @@ index 525bc856d..428cc21a4 100644
+      pub fn rtApp(self: *const Surface) *App {
+          return self.app;
+      }
+-@@ -1859,6 +1906,28 @@ pub const CAPI = struct {
++@@ -1899,6 +1946,28 @@ pub const CAPI = struct {
+          return surface.core_surface.child_exited;
+      }
+  
+@@ -266,7 +276,7 @@ index 525bc856d..428cc21a4 100644
+      export fn ghostty_surface_has_selection(surface: *Surface) bool {
+          return surface.core_surface.hasSelection();
+ diff --git a/src/termio.zig b/src/termio.zig
+-index b16885109..6931fcb58 100644
++index b168851..6931fcb 100644
+ --- a/src/termio.zig
+ +++ b/src/termio.zig
+ @@ -23,6 +23,7 @@ const message = @import("termio/message.zig");
+@@ -277,12 +287,125 @@ index b16885109..6931fcb58 100644
+  pub const Options = @import("termio/Options.zig");
+  pub const Termio = @import("termio/Termio.zig");
+  pub const Thread = @import("termio/Thread.zig");
++diff --git a/src/termio/backend.zig b/src/termio/backend.zig
++index c29009a..9857cbd 100644
++--- a/src/termio/backend.zig
+++++ b/src/termio/backend.zig
++@@ -11,28 +11,34 @@ const ProcessInfo = @import("../pty.zig").ProcessInfo;
++ const WRITE_REQ_PREALLOC = std.math.pow(usize, 2, 5);
++ 
++ /// The kinds of backends.
++-pub const Kind = enum { exec };
+++pub const Kind = enum { exec, host_managed };
++ 
++ /// Configuration for the various backend types.
++ pub const Config = union(Kind) {
++     /// Exec uses posix exec to run a command with a pty.
++     exec: termio.Exec.Config,
+++
+++    /// Host managed forwards terminal IO through embedder callbacks.
+++    host_managed: termio.HostManaged.Config,
++ };
++ 
++ /// Backend implementations. A backend is responsible for owning the pty
++ /// behavior and providing read/write capabilities.
++ pub const Backend = union(Kind) {
++     exec: termio.Exec,
+++    host_managed: termio.HostManaged,
++ 
++     pub fn deinit(self: *Backend) void {
++         switch (self.*) {
++             .exec => |*exec| exec.deinit(),
+++            .host_managed => |*host_managed| host_managed.deinit(),
++         }
++     }
++ 
++     pub fn initTerminal(self: *Backend, t: *terminal.Terminal) void {
++         switch (self.*) {
++             .exec => |*exec| exec.initTerminal(t),
+++            .host_managed => |*host_managed| host_managed.initTerminal(t),
++         }
++     }
++ 
++@@ -44,12 +50,14 @@ pub const Backend = union(Kind) {
++     ) !void {
++         switch (self.*) {
++             .exec => |*exec| try exec.threadEnter(alloc, io, td),
+++            .host_managed => |*host_managed| try host_managed.threadEnter(alloc, io, td),
++         }
++     }
++ 
++     pub fn threadExit(self: *Backend, td: *termio.Termio.ThreadData) void {
++         switch (self.*) {
++             .exec => |*exec| exec.threadExit(td),
+++            .host_managed => |*host_managed| host_managed.threadExit(td),
++         }
++     }
++ 
++@@ -60,6 +68,7 @@ pub const Backend = union(Kind) {
++     ) !void {
++         switch (self.*) {
++             .exec => |*exec| try exec.focusGained(td, focused),
+++            .host_managed => |*host_managed| try host_managed.focusGained(td, focused),
++         }
++     }
++ 
++@@ -70,6 +79,7 @@ pub const Backend = union(Kind) {
++     ) !void {
++         switch (self.*) {
++             .exec => |*exec| try exec.resize(grid_size, screen_size),
+++            .host_managed => |*host_managed| try host_managed.resize(grid_size, screen_size),
++         }
++     }
++ 
++@@ -82,6 +92,7 @@ pub const Backend = union(Kind) {
++     ) !void {
++         switch (self.*) {
++             .exec => |*exec| try exec.queueWrite(alloc, td, data, linefeed),
+++            .host_managed => |*host_managed| try host_managed.queueWrite(alloc, td, data, linefeed),
++         }
++     }
++ 
++@@ -99,6 +110,12 @@ pub const Backend = union(Kind) {
++                 exit_code,
++                 runtime_ms,
++             ),
+++            .host_managed => |*host_managed| try host_managed.childExitedAbnormally(
+++                gpa,
+++                t,
+++                exit_code,
+++                runtime_ms,
+++            ),
++         }
++     }
++ 
++@@ -108,6 +125,7 @@ pub const Backend = union(Kind) {
++     pub fn getProcessInfo(self: *Backend, comptime info: ProcessInfo) ?ProcessInfo.Type(info) {
++         return switch (self.*) {
++             .exec => |*exec| exec.getProcessInfo(info),
+++            .host_managed => null,
++         };
++     }
++ };
++@@ -115,10 +133,12 @@ pub const Backend = union(Kind) {
++ /// Termio thread data. See termio.ThreadData for docs.
++ pub const ThreadData = union(Kind) {
++     exec: termio.Exec.ThreadData,
+++    host_managed: termio.HostManaged.ThreadData,
++ 
++     pub fn deinit(self: *ThreadData, alloc: Allocator) void {
++         switch (self.*) {
++             .exec => |*exec| exec.deinit(alloc),
+++            .host_managed => |*host_managed| host_managed.deinit(alloc),
++         }
++     }
++ 
+ diff --git a/src/termio/HostManaged.zig b/src/termio/HostManaged.zig
+ new file mode 100644
+-index 000000000..0d1821350
++index 0000000..915aa0c
+ --- /dev/null
+ +++ b/src/termio/HostManaged.zig
+-@@ -0,0 +1,136 @@
++@@ -0,0 +1,173 @@
+ +const HostManaged = @This();
+ +
+ +const std = @import("std");
+@@ -419,116 +542,40 @@ index 000000000..0d1821350
+ +        _ = alloc;
+ +    }
+ +};
+-diff --git a/src/termio/backend.zig b/src/termio/backend.zig
+-index c29009acb..9857cbd7a 100644
+---- a/src/termio/backend.zig
+-+++ b/src/termio/backend.zig
+-@@ -11,28 +11,34 @@ const ProcessInfo = @import("../pty.zig").ProcessInfo;
+- const WRITE_REQ_PREALLOC = std.math.pow(usize, 2, 5);
+- 
+- /// The kinds of backends.
+--pub const Kind = enum { exec };
+-+pub const Kind = enum { exec, host_managed };
+- 
+- /// Configuration for the various backend types.
+- pub const Config = union(Kind) {
+-     /// Exec uses posix exec to run a command with a pty.
+-     exec: termio.Exec.Config,
+ +
+-+    /// Host managed forwards terminal IO through embedder callbacks.
+-+    host_managed: termio.HostManaged.Config,
+- };
+- 
+- /// Backend implementations. A backend is responsible for owning the pty
+- /// behavior and providing read/write capabilities.
+- pub const Backend = union(Kind) {
+-     exec: termio.Exec,
+-+    host_managed: termio.HostManaged,
+- 
+-     pub fn deinit(self: *Backend) void {
+-         switch (self.*) {
+-             .exec => |*exec| exec.deinit(),
+-+            .host_managed => |*host_managed| host_managed.deinit(),
+-         }
+-     }
+- 
+-     pub fn initTerminal(self: *Backend, t: *terminal.Terminal) void {
+-         switch (self.*) {
+-             .exec => |*exec| exec.initTerminal(t),
+-+            .host_managed => |*host_managed| host_managed.initTerminal(t),
+-         }
+-     }
+- 
+-@@ -44,12 +50,14 @@ pub const Backend = union(Kind) {
+-     ) !void {
+-         switch (self.*) {
+-             .exec => |*exec| try exec.threadEnter(alloc, io, td),
+-+            .host_managed => |*host_managed| try host_managed.threadEnter(alloc, io, td),
+-         }
+-     }
+- 
+-     pub fn threadExit(self: *Backend, td: *termio.Termio.ThreadData) void {
+-         switch (self.*) {
+-             .exec => |*exec| exec.threadExit(td),
+-+            .host_managed => |*host_managed| host_managed.threadExit(td),
+-         }
+-     }
+- 
+-@@ -60,6 +68,7 @@ pub const Backend = union(Kind) {
+-     ) !void {
+-         switch (self.*) {
+-             .exec => |*exec| try exec.focusGained(td, focused),
+-+            .host_managed => |*host_managed| try host_managed.focusGained(td, focused),
+-         }
+-     }
+- 
+-@@ -70,6 +79,7 @@ pub const Backend = union(Kind) {
+-     ) !void {
+-         switch (self.*) {
+-             .exec => |*exec| try exec.resize(grid_size, screen_size),
+-+            .host_managed => |*host_managed| try host_managed.resize(grid_size, screen_size),
+-         }
+-     }
+- 
+-@@ -82,6 +92,7 @@ pub const Backend = union(Kind) {
+-     ) !void {
+-         switch (self.*) {
+-             .exec => |*exec| try exec.queueWrite(alloc, td, data, linefeed),
+-+            .host_managed => |*host_managed| try host_managed.queueWrite(alloc, td, data, linefeed),
+-         }
+-     }
+- 
+-@@ -99,6 +110,12 @@ pub const Backend = union(Kind) {
+-                 exit_code,
+-                 runtime_ms,
+-             ),
+-+            .host_managed => |*host_managed| try host_managed.childExitedAbnormally(
+-+                gpa,
+-+                t,
+-+                exit_code,
+-+                runtime_ms,
+-+            ),
+-         }
+-     }
+- 
+-@@ -108,6 +125,7 @@ pub const Backend = union(Kind) {
+-     pub fn getProcessInfo(self: *Backend, comptime info: ProcessInfo) ?ProcessInfo.Type(info) {
+-         return switch (self.*) {
+-             .exec => |*exec| exec.getProcessInfo(info),
+-+            .host_managed => null,
+-         };
+-     }
+- };
+-@@ -115,10 +133,12 @@ pub const Backend = union(Kind) {
+- /// Termio thread data. See termio.ThreadData for docs.
+- pub const ThreadData = union(Kind) {
+-     exec: termio.Exec.ThreadData,
+-+    host_managed: termio.HostManaged.ThreadData,
+- 
+-     pub fn deinit(self: *ThreadData, alloc: Allocator) void {
+-         switch (self.*) {
+-             .exec => |*exec| exec.deinit(alloc),
+-+            .host_managed => |*host_managed| host_managed.deinit(alloc),
+-         }
+-     }
+- 
+++test "host-managed callbacks preserve bytes and resize" {
+++    const Recorder = struct {
+++        bytes: [16]u8 = undefined,
+++        count: usize = 0,
+++        size: [4]u32 = .{ 0, 0, 0, 0 },
+++
+++        fn write(raw: ?*anyopaque, data: [*]const u8, len: usize) callconv(.c) void {
+++            const self: *@This() = @ptrCast(@alignCast(raw.?));
+++            @memcpy(self.bytes[0..len], data[0..len]);
+++            self.count = len;
+++        }
+++
+++        fn resize(raw: ?*anyopaque, cols: u16, rows: u16, width: u32, height: u32) callconv(.c) void {
+++            const self: *@This() = @ptrCast(@alignCast(raw.?));
+++            self.size = .{ cols, rows, width, height };
+++        }
+++    };
+++    var recorder: Recorder = .{};
+++    var backend = HostManaged.init(.{
+++        .userdata = &recorder,
+++        .write = Recorder.write,
+++        .resize = Recorder.resize,
+++    });
+++    defer backend.deinit();
+++
+++    try backend.queueWrite(std.testing.allocator, undefined, "a\x00\r\n", false);
+++    try std.testing.expectEqualStrings("a\x00\r\n", recorder.bytes[0..recorder.count]);
+++    try backend.queueWrite(std.testing.allocator, undefined, "", false);
+++    try std.testing.expectEqual(@as(usize, 4), recorder.count);
+++    try backend.resize(.{ .columns = 80, .rows = 24 }, .{ .width = 800, .height = 480 });
+++    try std.testing.expectEqual([4]u32{ 80, 24, 800, 480 }, recorder.size);
+++
+++    var no_resize = HostManaged.init(.{ .write = Recorder.write, .userdata = &recorder });
+++    defer no_resize.deinit();
+++    try no_resize.resize(.{ .columns = 1, .rows = 1 }, .{ .width = 8, .height = 16 });
+++}
+diff --git a/Patches/ghostty/0003-prebuilt-framedata.patch b/Patches/ghostty/0003-prebuilt-framedata.patch
+index a949fba..3e7d3ed 100644
+--- a/Patches/ghostty/0003-prebuilt-framedata.patch
++++ b/Patches/ghostty/0003-prebuilt-framedata.patch
+@@ -35,7 +35,7 @@ index be61f029f..2b3965ddd 100644
+ -    } else {
+ -        if (b.lazyDependency("zlib", .{
+ -            .target = b.graph.host,
+--            .optimize = .ReleaseFast,
++-            .optimize = .fast,
+ -        })) |zlib_dep| {
+ -            exe.root_module.linkLibrary(zlib_dep.artifact("z"));
+ -        }
+diff --git a/Patches/ghostty/0011-replay-response-suppression.sh b/Patches/ghostty/0011-replay-response-suppression.sh
+index 823719d..6551763 100755
+--- a/Patches/ghostty/0011-replay-response-suppression.sh
++++ b/Patches/ghostty/0011-replay-response-suppression.sh
+@@ -71,15 +71,8 @@ src.insert_before(
+     /// reconstructed-history replay scope through the asynchronous surface
+     /// mailbox.
+     ///
+-    /// `kitty_clipboard_read`/`kitty_clipboard_write` are deliberately not
+-    /// covered here: the receiver takes ownership of the boxed request state
+-    /// and must destroy it, and this classifier only knows how to drop a
+-    /// message, not release owned state (see `termio.Message.write_alloc`
+-    /// for the pattern this would need). Replaying reconstructed history
+-    /// that contains a Kitty clipboard protocol sequence can still leak a
+-    /// confirmation to the host; this is a pre-existing gap, not a
+-    /// regression, since Kitty clipboard support did not exist when replay
+-    /// suppression was introduced.
++    /// Kitty clipboard packets are dropped by StreamHandler.kittyClipboard
++    /// before allocating request state or changing an in-flight write.
+     pub fn discardIfTerminalResponse(self: Message) bool {
+         return switch (self) {
+             .report_title, .clipboard_read => true,
+@@ -242,6 +235,49 @@ src.replace(
+         self.suppress_terminal_responses = false;
+         defer self.suppress_terminal_responses = suppress;
+         self.renderer_state.mutex.unlock(global.io());
++""",
++)
++src.replace(
++    """    ) error{ OutOfMemory, WriteFailed }!void {
++        const kitty_clipboard = terminal.kitty.clipboard;
++
++        // Decode and validate the metadata.""",
++    """    ) error{ OutOfMemory, WriteFailed }!void {
++        // Boxed clipboard requests outlive parser replay through the surface
++        // mailbox. Drop packets before allocating or mutating request state.
++        if (self.suppress_terminal_responses) return;
++
++        const kitty_clipboard = terminal.kitty.clipboard;
++
++        // Decode and validate the metadata.""",
++)
++src.insert_before(
++    'test "kitty clipboard read: targets-only never consumes a one-time grant" {',
++    """test "kitty clipboard replay does not allocate or dispatch packets" {
++    const testing = std.testing;
++    var handler: StreamHandler = undefined;
++    handler.alloc = testing.failing_allocator;
++    handler.suppress_terminal_responses = true;
++
++    // A request with an id allocates during metadata parsing. Replay must
++    // drop it before parsing, including packets that mutate a live write.
++    inline for (.{ "read", "write", "wdata", "walias" }) |op| {
++        try handler.kittyClipboard(.{
++            .metadata = "type=" ++ op ++ ":id=replay",
++            .payload = "dGV4dC9wbGFpbg==",
++            .terminator = .st,
++        });
++    }
++
++    // Normal input must still reach the parser and its allocator.
++    handler.suppress_terminal_responses = false;
++    try testing.expectError(error.OutOfMemory, handler.kittyClipboard(.{
++        .metadata = "type=read:id=normal",
++        .payload = null,
++        .terminator = .st,
++    }));
++}
++
+ """,
+ )
+ src.save()
+diff --git a/Patches/ghostty/0015-hold-frame-for-prompt-redraw.sh b/Patches/ghostty/0015-hold-frame-for-prompt-redraw.sh
+index b77fc6a..89e93a8 100755
+--- a/Patches/ghostty/0015-hold-frame-for-prompt-redraw.sh
++++ b/Patches/ghostty/0015-hold-frame-for-prompt-redraw.sh
+@@ -708,7 +708,7 @@ src.replace(
+ """,
+ )
+ src.insert_before(
+-    "        /// True if our renderer is using vsync. If true, the renderer or apprt\n",
++    "        /// Create the display link if needed, then ask it to match the\n",
+     """        /// Whether the frame stays held for a prompt redraw; see updateFrame.
+         /// Called on the render thread with the terminal state locked.
+         fn promptRedrawHeld(self: *Self, t: *terminal.Terminal) bool {
+diff --git a/Script/build-ghostty.sh b/Script/build-ghostty.sh
+index a04de92..e120f63 100755
+--- a/Script/build-ghostty.sh
++++ b/Script/build-ghostty.sh
+@@ -82,7 +82,7 @@ CURRENT_STAMP=$(
+     {
+         git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || echo "no-source-rev"
+         zig version 2>/dev/null || echo "no-zig"
+-        echo "$ZIG_TARGET" "${ZIG_OPTIMIZE:-ReleaseFast}"
++        echo "$ZIG_TARGET" "${ZIG_OPTIMIZE:-fast}"
+         # Patch *content*, not just names -- editing a patch in place must
+         # invalidate, which a filename listing would miss.
+         cat "$ROOT_DIR"/Patches/ghostty/* 2>/dev/null
+@@ -116,7 +116,7 @@ mkdir -p \
+ 
+ ZIG_BUILD_COMMAND=(
+     zig build
+-    -Doptimize=${ZIG_OPTIMIZE:-ReleaseFast}
++    -Doptimize=${ZIG_OPTIMIZE:-fast}
+     -Dapp-runtime=none
+     -Demit-exe=false
+     -Demit-xcframework=false
+@@ -183,7 +183,12 @@ fi
+ # which crashes consumers at launch on older OS versions.
+ COMPAT_SOURCE="$ROOT_DIR/Script/support/libcxx-verbose-abort-compat.c"
+ COMPAT_OBJECT="$LOCAL_CACHE_DIR/libcxx-verbose-abort-compat.o"
+-zig cc -target "$ZIG_TARGET" -Os -fno-sanitize=undefined -c "$COMPAT_SOURCE" -o "$COMPAT_OBJECT"
++COMPAT_TARGET="$ZIG_TARGET"
++# Zig 0.17 cc defaults to macOS 15; match Ghostty's macOS 13 minimum.
++if [[ "$ZIG_TARGET" == *-macos ]]; then
++    COMPAT_TARGET="$ZIG_TARGET.13.0"
++fi
++zig cc -target "$COMPAT_TARGET" -Os -fno-sanitize=undefined -c "$COMPAT_SOURCE" -o "$COMPAT_OBJECT"
+ xcrun libtool -static -no_warning_for_no_symbols \
+     -o "$OUTPUT_DIR/lib/libghostty.a" \
+     "$LIBRARY_PATH" \

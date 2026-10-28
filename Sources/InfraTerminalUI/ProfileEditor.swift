@@ -28,7 +28,7 @@ struct ProfileEditImpact {
             if let username = change.updatedUsername { return "이름 변경: \(change.originalUsername) → \(username)" }
             return "계정 삭제: \(change.originalUsername)"
         }.joined(separator: "\n")
-        return "\(accounts)\n\n위 계정의 열린 탭 \(openTabCount)개와 닫힌 탭 기록 \(closedTabCount)개를 앱에서 제거합니다. 이 서버의 앱 연결은 모두 해제됩니다.\n\n원격 로그인 계정·파일·tmux 세션과 로컬 SSH 키 파일은 유지됩니다. 이름이 바뀐 계정은 새 계정으로 저장되며 관리 키 연결이 해제됩니다. 앱에서 설정한 키를 사용하려면 저장 후 ‘SSH 키 설정’을 다시 진행하세요."
+        return "\(accounts)\n\n위 계정의 열린 탭 \(openTabCount)개와 닫힌 탭 기록 \(closedTabCount)개를 앱에서 제거합니다. 이 서버의 앱 연결은 모두 해제됩니다.\n\n원격 로그인 계정·파일·tmux 세션과 로컬 SSH 키 파일은 유지됩니다. 이름이 바뀐 계정은 새 계정으로 저장되며 관리 키 연결이 해제됩니다. 저장하면 새 계정의 SSH 키 자동 설정 화면이 열립니다."
     }
 }
 
@@ -63,7 +63,7 @@ struct ProfileEditor: View {
     let save: (ServerProfile) async throws -> Void
 
     init(profile: ServerProfile?, tabs: [TerminalTab], demo: Bool = false, save: @escaping (ServerProfile) async throws -> Void) {
-        let account = SSHAccount(username: "")
+        let account = SSHAccount(username: "", authMethod: .pendingKey)
         let value = profile ?? ServerProfile(name: "", host: "", accounts: [account], monitorAccountID: account.id)
         _profile = State(initialValue: value)
         _port = State(initialValue: String(value.port))
@@ -77,7 +77,7 @@ struct ProfileEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text(isNew ? "서버 추가" : "서버 편집").font(.title2.weight(.semibold))
-            Text("서버를 저장한 뒤 ‘SSH 키 설정’에서 비밀번호를 한 번 입력하면 키 생성·등록·검증을 자동으로 완료합니다. 비밀번호는 저장하지 않습니다.").font(.caption).foregroundStyle(appearance.colors.muted)
+            Text("새 계정은 앱 전용 SSH 키를 새로 만듭니다. 저장 후 서버 비밀번호를 한 번 입력하면 키 생성·등록·검증을 완료합니다. 기존 키 파일과 서버에 등록된 공개 키는 유지하며, 비밀번호는 저장하지 않습니다.").font(.caption).foregroundStyle(appearance.colors.muted)
             if !isNew {
                 Text("저장하면 이 서버의 앱 연결은 모두 해제됩니다. 원격 작업은 유지됩니다.")
                     .font(.caption).foregroundStyle(appearance.colors.muted)
@@ -99,14 +99,20 @@ struct ProfileEditor: View {
                                 .buttonStyle(.borderless).disabled(profile.accounts.count <= 1)
                                 .accessibilityLabel("\(account.username) 계정 삭제")
                             }
-                            Picker("인증 방식", selection: $account.authMethod) {
-                                Text("SSH 키·기존 설정").tag(SSHAuthenticationMethod.system)
-                                if account.managedKey != nil {
-                                    Text("앱에서 설정한 SSH 키").tag(SSHAuthenticationMethod.managedKey)
-                                }
-                            }.disabled(demo || accountWasRenamed(account))
+                            if needsAutomaticSSHKeySetup(for: account) {
+                                LabeledContent("인증 방식", value: "새 SSH 키 자동 설정")
+                                Text(automaticSSHKeySetupMessage(for: account))
+                                    .font(.caption).foregroundStyle(appearance.colors.muted)
+                            } else {
+                                Picker("인증 방식", selection: $account.authMethod) {
+                                    Text("SSH 키·기존 설정").tag(SSHAuthenticationMethod.system)
+                                    if account.managedKey != nil {
+                                        Text("앱에서 설정한 SSH 키").tag(SSHAuthenticationMethod.managedKey)
+                                    }
+                                }.disabled(demo)
+                            }
                             if accountWasRenamed(account) {
-                                Text("계정 이름을 변경하면 새 계정으로 저장되고 관리 키 연결이 해제됩니다. 앱에서 설정한 키를 사용하려면 저장 후 ‘SSH 키 설정’을 다시 진행하세요. 기존 SSH 키 파일은 유지됩니다.")
+                                Text("계정 이름을 변경하면 새 계정으로 저장되고 관리 키 연결이 해제됩니다. 저장 후 SSH 키 자동 설정 화면이 열립니다. 기존 SSH 키 파일은 유지됩니다.")
                                     .font(.caption).foregroundStyle(appearance.colors.muted)
                             } else if account.authMethod == .managedKey {
                                 Text(account.managedKey?.requiresAgent == true
@@ -120,7 +126,7 @@ struct ProfileEditor: View {
                         Text("마지막 계정은 삭제할 수 없습니다. 서버 전체를 지우려면 서버 메뉴의 ‘서버 삭제…’를 사용하세요.")
                             .font(.caption).foregroundStyle(appearance.colors.muted)
                     }
-                    Button("계정 추가", systemImage: "plus") { profile.accounts.append(SSHAccount(username: "")) }
+                    Button("계정 추가", systemImage: "plus") { profile.accounts.append(SSHAccount(username: "", authMethod: .pendingKey)) }
                 }
                 Section("모니터링") {
                     Toggle("앱 실행 중 자원 수집", isOn: $profile.monitoringEnabled)
@@ -148,6 +154,20 @@ struct ProfileEditor: View {
             } message: {
                 Text(ProfileEditImpact(original: originalProfile, draft: profile, tabs: tabs).confirmationMessage)
             }
+    }
+
+    func needsAutomaticSSHKeySetup(for account: SSHAccount) -> Bool {
+        if account.authMethod == .pendingKey { return true }
+        guard let original = originalProfile?.accounts.first(where: { $0.id == account.id }) else { return true }
+        return original.username != account.username
+    }
+
+    func automaticSSHKeySetupMessage(for account: SSHAccount) -> String {
+        if demo { return "데모에서는 실제 SSH 키를 생성하지 않습니다." }
+        if originalProfile?.accounts.contains(where: { $0.id == account.id && $0.username == account.username }) == true {
+            return "SSH 키 설정을 완료해야 연결할 수 있습니다. 서버 메뉴의 ‘SSH 키 설정’에서 다시 시도하세요."
+        }
+        return "저장 후 비밀번호를 한 번 입력하면 별도의 키를 생성·등록·검증합니다. 설정을 완료해야 연결할 수 있습니다."
     }
 
     private func accountWasRenamed(_ account: SSHAccount) -> Bool {

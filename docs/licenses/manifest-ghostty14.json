@@ -1,0 +1,1001 @@
+{
+  "libghostty_spm_revision": "5b9cb63d83e687b4a66d6c3a3c2a840341c576d9",
+  "displaylink_revision": "41bea2661e04bebcb1c4f15fc0b6197850100fdd",
+  "ghostty_revision": "83fb95624b0439ee660c2679b43b38c8b63769cd",
+  "notices": [
+    {
+      "file": "DisplayLink.txt",
+      "source": "https://github.com/Lakr233/DisplayLink/blob/41bea2661e04bebcb1c4f15fc0b6197850100fdd/LICENSE",
+      "sha256": "5dffb6c45faaa71f6c393255b135145cc17f0b07e968a705ef58f9c68aeb112d"
+    },
+    {
+      "file": "FreeType.txt",
+      "source": "https://github.com/freetype/freetype/tree/VER-2-13-2",
+      "sha256": "51efe07db97c04377ef0292ddc255f40585bdc65093e95254974e233d724c055"
+    },
+    {
+      "file": "Ghostty.txt",
+      "source": "https://github.com/ghostty-org/ghostty/blob/83fb95624b0439ee660c2679b43b38c8b63769cd/LICENSE",
+      "sha256": "386211873e5b7a02f663ae4d7adf96285999f91608f8f9f31fecfd0f4095e6f1"
+    },
+    {
+      "file": "Highway.txt",
+      "source": "https://github.com/google/highway/tree/66486a10623fa0d72fe91260f96c892e41aceb06",
+      "sha256": "f31cf79b4168aabec8c697dca3b30633b643e30440659ef2347bcc10e17eaad5"
+    },
+    {
+      "file": "JetBrainsMono.txt",
+      "source": "https://github.com/JetBrains/JetBrainsMono/blob/v2.304/OFL.txt",
+      "sha256": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
+    },
+    {
+      "file": "NerdFontsSymbolsOnly.txt",
+      "source": "https://deps.files.ghostty.org/NerdFontsSymbolsOnly-3.4.0.tar.gz",
+      "sha256": "e26dcbdd3d6659395572bc18d537f60dc461804a2c5efd5797d2ddb17ee1c1c2"
+    },
+    {
+      "file": "Wuffs.txt",
+      "source": "https://deps.files.ghostty.org/wuffs-7411f488fe2e2c205c3d3b3d28638b7356522930.tar.gz",
+      "sha256": "f8ac2c75e7f629a87565c80d61ff9fe5aa15cdea0bda997d52a4dc13fdbd19cb"
+    },
+    {
+      "file": "Zig.txt",
+      "source": "https://github.com/ziglang/zig/blob/0.17.0/LICENSE",
+      "sha256": "5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff177"
+    },
+    {
+      "file": "bash-preexec.txt",
+      "source": "https://github.com/Lakr233/libghostty-spm/blob/5b9cb63d83e687b4a66d6c3a3c2a840341c576d9/Sources/GhosttyTerminal/Resources/Ghostty/shell-integration/bash/LICENSE-bash-preexec.md",
+      "sha256": "7d36c9d9c0ae6e92e7e7000e3aab7715ab6463997f995e100848740fde29c7cf"
+    },
+    {
+      "file": "libghostty-spm.txt",
+      "source": "https://github.com/Lakr233/libghostty-spm/blob/5b9cb63d83e687b4a66d6c3a3c2a840341c576d9/LICENSE",
+      "sha256": "1f4b38df6a142e678a85d84c3a7ec4d1db328a556483241df714156134e81615"
+    },
+    {
+      "file": "libpng.txt",
+      "source": "https://github.com/pnggroup/libpng/blob/v1.6.43/LICENSE",
+      "sha256": "7317e078e2d3b5d7ba5a6159e650945153262b44b76f6700f8e9edb261c5143e"
+    },
+    {
+      "file": "libvaxis.txt",
+      "source": "https://github.com/rockorager/libvaxis/tree/6fd944a27fb3d6f596e981076381a3131f2448b4",
+      "sha256": "d778a290b74dbaeecfadc65a351dd2a75898e5a601f14d083531552ef9df3b8b",
+      "source_file": "ghostty14/libvaxis.txt"
+    },
+    {
+      "file": "libxev.txt",
+      "source": "https://github.com/mitchellh/libxev/tree/819ffa180ca20e31c7eded74e2e1aceb1eab557f",
+      "sha256": "f04af36ef623e3a957dbc05d0ad050799e69a6fe39d136a950441861f70ee3c4"
+    },
+    {
+      "file": "oniguruma.txt",
+      "source": "https://github.com/kkos/oniguruma/blob/v6.9.9/COPYING",
+      "sha256": "70ba5469ea0bab6e18a32d7009068f996503168d27be57747e08da34337ff26f"
+    },
+    {
+      "file": "simdutf.txt",
+      "source": "https://github.com/simdutf/simdutf/tree/v9.0.0",
+      "sha256": "fc6d0b102b2102d3e2273d605e8fb74197f3cdf63574f0f3d140bf7e2457ebb6"
+    },
+    {
+      "file": "stb.txt",
+      "source": "https://github.com/ghostty-org/ghostty/tree/83fb95624b0439ee660c2679b43b38c8b63769cd/src/stb",
+      "sha256": "cbb23d6b843b68f3763ad203e2171f33137e2b41b804bd6d67eb9d6b93f1b573"
+    },
+    {
+      "file": "uucode.txt",
+      "source": "https://github.com/jacobsandlund/uucode/tree/ea62149739404a73c202b48a33bf6dd2af4bd9b0",
+      "sha256": "e2aeb29fcdd609216013ba72d34f0e783d8b8248c140656b2ffcfa757f26dafd"
+    },
+    {
+      "file": "z2d.txt",
+      "source": "https://github.com/vancluever/z2d/tree/40af3e84a4e15a9f31d126b3f281f23ce6a3dae5",
+      "sha256": "af768dd84e3e199ffb8dc63528de40bc387fed26e22c694a0b3d245cbf0a692d",
+      "source_file": "ghostty14/z2d.txt"
+    },
+    {
+      "file": "zf.txt",
+      "source": "https://github.com/natecraddock/zf/blob/87153bb86b75d21fbac897b738f316d449f5d0c9/LICENSE",
+      "sha256": "0629000344ad0dc3c6e0e4c1b0c4a5cacf090e17d56e8bc5272705e3d35b7def"
+    },
+    {
+      "file": "zig_objc.txt",
+      "source": "https://github.com/mitchellh/zig-objc/blob/3352c12a868f8787ab71bf2ca6eab9fcfb635c52/LICENSE",
+      "sha256": "fcd26bcead569a910dd778cb864e027683498ca414e15db1694a5893eee1b835"
+    },
+    {
+      "file": "zlib.txt",
+      "source": "https://github.com/madler/zlib/blob/v1.3.1/LICENSE",
+      "sha256": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243"
+    }
+  ],
+  "local_wrapper_files": [
+    {
+      "path": "Ghostty.ref",
+      "sha256": "b8e4cfb7632fc04d46a27f9689bffb497caed93ed5227f8990cf8e497e888dc9"
+    },
+    {
+      "path": "Package.swift",
+      "sha256": "e581155440d2d522fd734ffc08e232128dbdb7cc713e57bc33cc3da8ced455e0"
+    },
+    {
+      "path": "Sources/GhosttyKit/GhosttyKit.swift",
+      "sha256": "c9a3ba6c4e27fca1d5059bb431b0a80dd32e48f41c31f1572fb73f730116ec3a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/GhosttyConfigRenderer.swift",
+      "sha256": "a670c5e82ee6bb8f7eb55334b92f0ab6e938b5f24f366b78007c65f89d40877d"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/GhosttyRuntimeResources.swift",
+      "sha256": "44f8edcd7ed1e222f408487df026d2e40edc9bcf7b78bf3220be683b22450d03"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalColor+SwiftUI.swift",
+      "sha256": "9c35c0eb6e5c12e3cb30754368b6de66c1854b1143a4334861d76d488de6543d"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalColor.swift",
+      "sha256": "ea0cc80f33632178a9e4d428d5086b44a0deb39658dfed9071c87c7459b528c5"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalColorScheme+SwiftUI.swift",
+      "sha256": "3167f12b29c4884a7c156fd371ad53dad6ec2180d3bafb51ade3a003ac82d86a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalColorScheme.swift",
+      "sha256": "975cbd2d5ad8b70335a5d8fa5ba3d6324bfc696122808326bd47b0abeb6e3da6"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalConfiguration.swift",
+      "sha256": "5ce0521991fba89b87c90c173b776f5e58cddd28ba8b6675d4fb0cf46a2c5085"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalLocaleEnvironment.swift",
+      "sha256": "e070ca678ae5397664123edadfe4841511a1b10f97026ff176596246fdd43ee0"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalLocaleName+Tables.swift",
+      "sha256": "8a6c5ffd17435d5e63d5d5851532228852d1c03bb432c932aead53d22f7c3ad0"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalLocaleName.swift",
+      "sha256": "78a4bffa58c9b415ed31b9ccb4b373c010cd596d2f347eaf6c057a509f0062af"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalTheme+Defaults.swift",
+      "sha256": "9443a6aec4a277d2c8a02bdf841c755cfc4a8adf8913c051f7a186ccb5120536"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Configuration/TerminalTheme.swift",
+      "sha256": "a043958890a702f0436a274e4310a81191c83ee983a661c69fe76438ae3edca1"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Controller/TerminalController+Callbacks.swift",
+      "sha256": "6adfe6f7d273a6139477137d9f77b12b78cb9023f9ac6eb3246d84337db97c3d"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Controller/TerminalController+Config.swift",
+      "sha256": "3f725d2a075b206e6540c6b17256df69c24983803aad6d6a9c377ef5fb276def"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Controller/TerminalController+Surface.swift",
+      "sha256": "0f87dfc3768bb445c072e482675140391ada39ea9656c9593273111f8242a1de"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Controller/TerminalController.swift",
+      "sha256": "e49c47dc9eefe8bca1e79abe29bac09bc5868516ea5c4bb3dbf6f41872ef9985"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Controller/TerminalWakeupGate.swift",
+      "sha256": "6d736c8a62ab967d1f7a70fd6b52e29949962da1ff865557049d48c54313f57e"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Debug/TerminalDebugLog.swift",
+      "sha256": "afac92374c228ea13cf191879b7a8a0c5ded15ff194d5a5719c3dba64a1e9681"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/InMemory/InMemoryTerminalPendingOperations.swift",
+      "sha256": "440b27f50638db24bf70a90088f60e972714b3580911e965c5ec7261584d43d3"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/InMemory/InMemoryTerminalSession.swift",
+      "sha256": "3acae15719ea2537348db0f3c278ddb62fd640e5270c74c4f86eea45ad7c7ed1"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/InMemory/InMemoryTerminalSurfaceAccess.swift",
+      "sha256": "769aa1f632fa495bb51cdced8148207d89011bf45cc58b0a119b12203eba8fd1"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/InMemory/InMemoryTerminalViewport.swift",
+      "sha256": "b39717be7feaaa7d054801b087ece9d2a8d5ae418c87e98275f25bfc81c2c65a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/InMemory/TerminalCallbackBridge.swift",
+      "sha256": "99f4327dc6c3e37339ea91ec06d4280318504cc2842ead5b72cd1c0061a3ab84"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/InMemory/TerminalSessionBackend.swift",
+      "sha256": "1535140700680e6e33406dfb1428e75ddc88dd50b13da6d4379203ff6ce56955"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Metrics/TerminalGridMetrics.swift",
+      "sha256": "f26cae281bfa45f9edb66bb8f7a822937a928cfc319843239ed6f36358af96a5"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Metrics/TerminalInputModifiers.swift",
+      "sha256": "38dfdda2ac4cd1776a9b84db803e042033fb693503c274d6e0d890ab9926bc3a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Metrics/TerminalScrollModifiers.swift",
+      "sha256": "e973dd1654f6397fe88fc1a3d27848e75ae81407153f31083154f2b07b9eef9c"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Metrics/TerminalViewportMetrics.swift",
+      "sha256": "29f03ae427c1f09997d92d3151d758007860cc9ce38551d89c886b8a64be8d8c"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Drop.swift",
+      "sha256": "f3a95963c343cc3b85b9be2403762ed59728644d3d65b668954c8be4f63dbd36"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Input.swift",
+      "sha256": "097f65a9a494b550b6acf68b6f4a038bc709627e5c06c44efddc64fe91b68a3e"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Lifecycle.swift",
+      "sha256": "7fb4c8190e812eea29e6ae48aeb1db216e5ebff7b9c8210286707d1b50c1db87"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+NSTextInputClient.swift",
+      "sha256": "72f2ecc0261eceac034f4e6908a415cc6bd34816dad8ef275d09a8733c96bb3a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+PublicInput.swift",
+      "sha256": "57849c7c737632bd0c9c7be9c845b2d49aabce044757fb4ba89690c780450054"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+PublicSelection.swift",
+      "sha256": "9d05b1aca344c30b4ba2309f406727dc579c15342fed94267ed5ee7ed7c4427a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Snapshot.swift",
+      "sha256": "b355606483076fd48e5503bb1ee6aa4b1cfda1ae33bc8da576426e7589e155a0"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView.swift",
+      "sha256": "bc45c180682152c16aa3e9d93fd5054d532b2d3595d714adc35580c6eb6b4e2e"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/KeyboardLayout.swift",
+      "sha256": "0ed3f82bc66b27279bf9cb200380e866677b09fce98e5d52ba99cc4ed15f33f9"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/TerminalDropPaste.swift",
+      "sha256": "c20d6ffa5516e0fefc8a10e5ef048d9c941077b2c2a1cb10c49b2d3e2e1ae081"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/TerminalKeyEventHandler@AppKit.swift",
+      "sha256": "684e1ad4abb7ccbedece830c7f0933ad4f610109cd9eec94e3ab293665af5be8"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/AppKit/TerminalTextInputHandler@AppKit.swift",
+      "sha256": "6c52a8aaedb18db21dc82aaa22300a45b399a16cfdfd7a31471c02be20c3d680"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/PlatformSupport.swift",
+      "sha256": "f215a2bec2d03a3c27198c73380bf4d5534a4ef2eaa5b6768407dcb464315e9f"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalFileStaging.swift",
+      "sha256": "3357b8bfddead1f8849b5f9a8ddc2799d08497520ea07cbada78657dd740956a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalFontSize.swift",
+      "sha256": "9720426e3c8e7b330550e40be48eb0f089a65dc17bfa7753fae2a405b0738f7c"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalFontSizeAction.swift",
+      "sha256": "e52a2c65ccac82309bce40825d300fc87b53ba932fa2f460d562c2497f995db2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalHardwareKeyRouter.swift",
+      "sha256": "4ec69ade6b39dd441abbed6a7c3b5633367f7c63917a94ab379bb5d41cf0a116"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalIMEComposition.swift",
+      "sha256": "47a605f1d7b905148000340e34067c1612f6c1831489cc39af7c5ce596c0c397"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalInputDocument.swift",
+      "sha256": "f24013829ce575dd184450f02f9ac4be4020b68a60a71fe949b173d219dcb55c"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalInputText.swift",
+      "sha256": "36d1b5b07d6d50b9862d008ee4a15c3accf233438867f82b4a93f27196d0fd1f"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalKeyRepeat.swift",
+      "sha256": "d76352a1da3762c5be9e446926f2dfc2b173539cf68fe1b79cf85819d1918f91"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalMainActor.swift",
+      "sha256": "5805944608b4afcb72f5e55705a68dff2b0144204dbcf33de884692de82f2dcf"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalMarkedTextState.swift",
+      "sha256": "ed22c95fa9f0a48e86d16b8335e1556609b3d90332d4f2e3bd7f5cc1455461f2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalPasteboardContent.swift",
+      "sha256": "42920eef76a23c97c99bfb76969646dfa18600165138058bf32823a24391040d"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalPointerPolicy.swift",
+      "sha256": "9d6caf53e15cadb757cef08ae92452a38756a9b8b83442cf1d0fda9ab0681220"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalShellEscape.swift",
+      "sha256": "ab675a99709241965ddec8a15d4db17b5dc56801dee49d42965abef27610bbdf"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/Shared/TerminalView+Process.swift",
+      "sha256": "85c8521899b78af8725a06f2891fea3eebb5f2d5d42d51ac69d7e5c772bbb1e2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/InputAccessory/TerminalInputAccessoryItemPresentation.swift",
+      "sha256": "9cb7ac3012e84800a56a420bb66e7ae2eb32e451bb8c2daa6eb6a1b2f9566114"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/InputAccessory/TerminalInputAccessoryStyle.swift",
+      "sha256": "718f421243941cc09e6f6a03925152f3d3ce17161b905a446edcb1cbb1154cb7"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/InputAccessory/TerminalInputAccessoryView.swift",
+      "sha256": "db3f7ac9a1d4e1d46c622bf4fd9ae0a836e943165dbdc2642cc166518ab26bcc"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/InputAccessory/TerminalInputBarKey.swift",
+      "sha256": "7b40d446c67fa3e63e365b210d1871a8f7b2ab9ef958acd295d49eef9ba9e4bb"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/InputAccessory/TerminalStickyModifierState.swift",
+      "sha256": "81d1d39d159161af9e88a1b243461e3279126b8b2cc12001a7746bd70437fef7"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/InputAccessory/UITerminalView+InputAccessory.swift",
+      "sha256": "96f083234cfa1bda20eb363431b6e7ae5117b53b6e871911245114e3bdaf02f7"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/InputAccessory/UITerminalView+PublicSticky.swift",
+      "sha256": "46eeee700ebe0eb8df3154d410965f7d68dc8b52c568b9c875e4675c49200fee"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/TerminalTextInputHandler@UIKit.swift",
+      "sha256": "4f16fce43b6c495147c61b95af84c508256555918151ad0ffc117d3dbb171eca"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/TerminalTextPosition.swift",
+      "sha256": "da01fb43732d3614f226144b3b9c551f5bffd8f29c357186c8888e6143783c9f"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/TerminalTouchMenuContext.swift",
+      "sha256": "04582152cde1e8aa2441e6dc08e5830c43c70e625842265b226738f3dfcb1963"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/TerminalTouchSelectionMenuContext.swift",
+      "sha256": "89f7f27137fb4959876abf0b3fcf4132bd9d37ee069acdf29ba8b7915446eec2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/TerminalTouchSelectionOverlay.swift",
+      "sha256": "c2fe0ac5ef4fcfbb11ec0658841ff70f003c0531ee2f62ae9d433ca98db29284"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Clipboard.swift",
+      "sha256": "6f48bfb55dc4b26d2a0b3ca3362a9a6c4d3e42427a1acfdd220745849a5571a2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Drop.swift",
+      "sha256": "799b8a6f66d15f6e80dadcb6769b9b9d99c011b267a167cd872cc3f55a896588"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Input.swift",
+      "sha256": "3d08c42bdc37204b1b0945a89da6acfc741400cefaf49d8c84342c5c0e1fb3d1"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Interaction.swift",
+      "sha256": "47efcea3856b597e38916bca2e77ad8afcadf9b470d6df0167540a2b595acf74"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+KeyCommands.swift",
+      "sha256": "c5f089b009a4f291fd0e2db0a6c622bc9ea082e87d7bf9dd19776a0ac5ff7e54"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Keyboard.swift",
+      "sha256": "9e8ed9800bf3d1bf4ffaff02d816a7efe31a08b9a336cf6347b17df6e0471d9b"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Lifecycle.swift",
+      "sha256": "b2f645e6955dcfe6828f4a24d116126567e3f15819ea3bc257abb6af21bf3dff"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+PinchZoom.swift",
+      "sha256": "0fca7b0e380c3beb1ba831c7728e1c8020dd9ecc691be1354a01ebf336028d28"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Pointer.swift",
+      "sha256": "3148cf709e89d8c9977cad49cdc2b1893d762aad9c5a1548e1d1fd0c26d09a74"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicInput.swift",
+      "sha256": "13e34e6474d21203b82d4982465775624cd3489c4c62e92911215dbcd34dfb75"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+PublicSelection.swift",
+      "sha256": "67bfb9b68be8e0efa6dbc9c0a3756ec27f64f3affe7c5f22cf5bb74cec78a4b7"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Scroll.swift",
+      "sha256": "62550a1521fb9202dd3eca056d76068a51b8e873bff1ee59e7918a83695b8e58"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+Snapshot.swift",
+      "sha256": "76b16d70bb95f34be9904dfa208d0adca752c398988a1c519edf4b57399fab60"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+TouchGestures.swift",
+      "sha256": "2c1439d6fb665c8b8d106eb08359af5166aa0e301f9bc2f8c015d7e844f192d9"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+TouchMenu.swift",
+      "sha256": "4d2e1003a178744b8426b529e21ab9df46d37bf0813ada094b9ba3dada4cc421"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+TouchMenuActions.swift",
+      "sha256": "5d6812f85a0df9d1926892cd13b8b817af83bfda0ba0ab7ea51c91b6fe425f9e"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+TouchSelection.swift",
+      "sha256": "73eabd97c756a1265f326e19c510243d6d3c60911dfc6b7db14f50053bc865d2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+TouchSelectionDrag.swift",
+      "sha256": "1c3e27bbb6372c4473ee976ff1f73f168bfcc7874d124a80341551f3fff25104"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+TouchSelectionLoupe.swift",
+      "sha256": "56ef2a57375f14bfd757c9c4f4f726d9db5f52be83ebf310448f9a1de1d8bbeb"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView+UITextInput.swift",
+      "sha256": "ff565498f709abe7d79011466fe437575e7615e5026732fd8976beb0b6678be6"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Platform/UIKit/UITerminalView.swift",
+      "sha256": "4465852e9dda3d46845c1757fe55188fec95b45909e8bc2312c6b9b7f135527b"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Ghostty/shell-integration/bash/LICENSE-bash-preexec.md",
+      "sha256": "7d36c9d9c0ae6e92e7e7000e3aab7715ab6463997f995e100848740fde29c7cf"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Ghostty/shell-integration/bash/bash-preexec.sh",
+      "sha256": "998f4d5e9dd82e254463228cc6caa4d40125ae79b31d5a16a2a2f49357f0c160"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Ghostty/shell-integration/bash/ghostty.bash",
+      "sha256": "f3577aa5c222afbf529c635e19a0598d7d54be29225282b1f10903e3a30131e6"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Ghostty/shell-integration/zsh/.zshenv",
+      "sha256": "f93e7460e206bcb51fdc6114df7791b32f04b97921f3d858b96cd033607d8cbb"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Ghostty/shell-integration/zsh/ghostty-integration",
+      "sha256": "0dfa325fc8778a8d928d0149ff008e8e8f6b5c6215285bbf2eff00a68b95f612"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/ar.lproj/Localizable.strings",
+      "sha256": "fc67c378196fbeeb5683e49efada784346c91ffdccd4035167222545cb36c11f"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/bn.lproj/Localizable.strings",
+      "sha256": "cbdb9ab55797eda0918e1d827cf1b467571a324d316cae3b09faea5222d06e64"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/de.lproj/Localizable.strings",
+      "sha256": "204a114a17576e901a8a6fa7dad2d9c67804ba3ca5fc58556b63f67ed34d154c"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/en.lproj/Localizable.strings",
+      "sha256": "2fd206585cbf67b0f0a985aee321f1b234560efb43268605692f3ff4d4cec943"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/es.lproj/Localizable.strings",
+      "sha256": "7954675c4bdd067e15f8bcabefd6494220a2a15c1c75d3a38e5806ab7a8b0157"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/fr.lproj/Localizable.strings",
+      "sha256": "fc187b2944f57e9d1ff4b92ff7b8e937d987419fc2ccbc2b04fbcb986572274e"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/hi.lproj/Localizable.strings",
+      "sha256": "a01956f8a4bfe947398b73dc8293a6336362cd6e27a2c59987efdb25a5d21f65"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/id.lproj/Localizable.strings",
+      "sha256": "fb39090564672f8fb8754e62f23c39638f465c2cb347c32b70d415fab48890ca"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/it.lproj/Localizable.strings",
+      "sha256": "2c009610693b2cc1f7732282ee4ff645c5ed2bfab6052daf972ec34810d5e5e7"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/ja.lproj/Localizable.strings",
+      "sha256": "5430a748cffc81af1abbbc42ef5f4bdfa9713fae11701b6aeb7f3878616e9e68"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/ko.lproj/Localizable.strings",
+      "sha256": "25246715d41197e5583f7f9e8ddfad7cbd57bbceb317a40cdb433e7ea2d4749f"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/pt-BR.lproj/Localizable.strings",
+      "sha256": "1e1af0b76467a8b0af6f7d261bc30d06ab771110b33d5ee2097dda393600a93a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/ru.lproj/Localizable.strings",
+      "sha256": "665111cf5748c3c371901de4332dfdb707071273ee9286cdccaa50a97e9236b6"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/sw.lproj/Localizable.strings",
+      "sha256": "2a9aa83ca25b425457bf0dc1f7d4eefe59a4e6b7b28245d834fdc4cbe38dee0c"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/tr.lproj/Localizable.strings",
+      "sha256": "e7b9292bca027b3b0bee7833a4c23eeeeb8ba61d590a9e8197209056a28455ea"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/vi.lproj/Localizable.strings",
+      "sha256": "298e74e0a4ba79d32c00e476118464ffa143f14c905e2f7b81b6d6b618f4c2c5"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/yo.lproj/Localizable.strings",
+      "sha256": "560b65bcd109b4f22f1e111b82703ceb8c626993d836240b16decedaad0f4e74"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/zh-Hans.lproj/Localizable.strings",
+      "sha256": "5fc7f7cf3af3c3280a9b48cf2d4c1d142af581bf9a2b62f56a34cdc42a0d9b08"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/Localization/zh-Hant.lproj/Localizable.strings",
+      "sha256": "f10e7d7eb874592422af64ea24402ca2668da199e1f9e0b68e50008f9067c9ad"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/terminfo/67/ghostty",
+      "sha256": "979287b032b3bff8e876810ce6f36d68bb20e2456db8caa91ec7ab0f2b5ecb1f"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Resources/terminfo/78/xterm-ghostty",
+      "sha256": "979287b032b3bff8e876810ce6f36d68bb20e2456db8caa91ec7ab0f2b5ecb1f"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/State/TerminalPendingPublishes.swift",
+      "sha256": "ea9148794e42d71c9a63b802396a2d72d03d4d98137d5757dbb12d8e3ab59b56"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/State/TerminalViewState+Delegate.swift",
+      "sha256": "eb424dd1426298673b92782ff8a11e3f78b58c96255f8f3c024e3c4b1784fbd2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/State/TerminalViewState+Mutation.swift",
+      "sha256": "d9f2881e6840b716e0a6b27649179732ba2afe794694a6c54bdfe20864b6f3e9"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/State/TerminalViewState.swift",
+      "sha256": "4b613a983eae1f4be11587ec1b517e247382b9655e1d7568360053d75daa69f2"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalCopyText.swift",
+      "sha256": "61f17e5bcee3faefdb780c79cecf22b909934b07105f55ce316ff829c09dbe06"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalKey.swift",
+      "sha256": "b05fe7878b0870e7ea22bfc4b4f1e9d0852ab60c8c49192ddc9d0f1e1b097271"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalKeyPress.swift",
+      "sha256": "1f0049bf1357d2d4b2e2de8a23f2b61c7b30f7167249021d9227281a408ad648"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSelectionGrid.swift",
+      "sha256": "198dcc0771c805b84a4627a9ca9fc39be30f9caa5a2b83e46db30bbb452b739b"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSelectionRegion.swift",
+      "sha256": "9569bbbd19a7e6fdb2eba01e07bc26e1cd7e34464dde121436d08a5925272859"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurface+FontSize.swift",
+      "sha256": "032e65478f6efd968d680ab3e9ccc0868d0f045b9788d6cd1d0a9906df5ed06a"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurface+SelectionRegion.swift",
+      "sha256": "312fc7efac34c31c11311edf28f757a64f13011377cde26c831858ae9f5a7235"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurface+TouchSelection.swift",
+      "sha256": "b07ba6a61c3e2477bfe4ba06864b42a3e2632886abe9e8a177dcc8871aca1a2b"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurface.swift",
+      "sha256": "71fb463f2fa2f784192ab3f4dac333c1efdcbcc55787cc28df8a55588e8d4824"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurfaceContext.swift",
+      "sha256": "3b00ee80353cc0c940c207a98ee538399a4212d7544800a456ae9c0091443ab9"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurfaceCoordinator+FontSize.swift",
+      "sha256": "1a0e21baa8189adf96679b75ffbf031b77105118312615f34c4923fd9dca3715"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurfaceCoordinator.swift",
+      "sha256": "3d02d76d30a3a8a2129bc17b6b50e0b06259e8b846f78940d1745f7392b638ba"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurfaceOptions.swift",
+      "sha256": "e9ade53044383fbf02402f602204c5293def37d24c7be902990a3e43065c45b8"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurfaceView.swift",
+      "sha256": "f3f89baaac3e4628475432ab11d8ccffa29ce5b5b43d442777b9da65ef9ffbdb"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/Surface/TerminalSurfaceViewDelegate.swift",
+      "sha256": "80a0c1b1f175767c0ad7f3d724a6d0f30333ec2f3f77ffd61648374d659508fa"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/View/TerminalView.swift",
+      "sha256": "81bcbed0c6c1d2c5c2f92e87fb910b7a852fb901592a51d0f8789391d0578964"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/View/TerminalViewRepresentable.swift",
+      "sha256": "c70dc90e102b1f58902a7a4ae0419d964ff612b002030cee466c3172f1619abf"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/View/TerminalViewRepresentable@AppKit.swift",
+      "sha256": "7a81ebc9cbca7416aef71879113296850858fc61946dc9a7a296bc5e9c106d59"
+    },
+    {
+      "path": "Sources/GhosttyTerminal/View/TerminalViewRepresentable@UIKit.swift",
+      "sha256": "f95ab0e28a500dcd8ed68cd06c855b1cac80e1a058d7521753dfff8e34000d50"
+    }
+  ],
+  "local_build_policy": {
+    "patches": [
+      {
+        "path": "Patches/ghostty/0001-darwin-libghostty-install.sh",
+        "sha256": "6a55e5cf2062565becfa5bdbadf0bc310f21f662b33c74da827d818a169eb3a1"
+      },
+      {
+        "path": "Patches/ghostty/0002-host-managed-io.patch",
+        "sha256": "ac3a5ab1669faf4061abffa07a1c993f3ace1d0c1ed22fd7976a5e5f43d3c9b7"
+      },
+      {
+        "path": "Patches/ghostty/0003-prebuilt-framedata.patch",
+        "sha256": "89e4100b8df748a329a14f3e2a9151d4e49158cb89d3f4117e5adacfc3e4f5ed"
+      },
+      {
+        "path": "Patches/ghostty/0004-ios-fixes.sh",
+        "sha256": "cb5cc8ed1518d0efd4d385c532a3c6916a9b68790118d4af551cadf114d4e646"
+      },
+      {
+        "path": "Patches/ghostty/0005-ios-metal-rendering.sh",
+        "sha256": "842e9ed52cea56e85e3f1860d867971fe589f8c1055a5d93492b61225aa3c6e2"
+      },
+      {
+        "path": "Patches/ghostty/0006-disable-custom-shaders.sh",
+        "sha256": "0791d405d77b7d8c9abd8eb705179726ccfae063bfbe0c9441b4b54cbcfb797a"
+      },
+      {
+        "path": "Patches/ghostty/0007-disable-inspector.sh",
+        "sha256": "41c4c9c61695323ab0c34521de939cc4a55ee332e36578741a202ed3fcb93a0a"
+      },
+      {
+        "path": "Patches/ghostty/0008-macos-metal-texture-storage.sh",
+        "sha256": "aed2feb34f402c2f254b544881b26ca5893bb03bdef04c3d7819e278ac6e79d7"
+      },
+      {
+        "path": "Patches/ghostty/0009-libcxx-apple-availability.sh",
+        "sha256": "640457845f739df678896d8e4ab55263da10fc3a0c3dc24348c9d793f5bf7aff"
+      },
+      {
+        "path": "Patches/ghostty/0010-fix-scroll-remainder-zeroing.patch",
+        "sha256": "6823217a05d53461e335cb46b10cd4f904894c01143cf1ed1dbae65661fbd66e"
+      },
+      {
+        "path": "Patches/ghostty/0011-replay-response-suppression.sh",
+        "sha256": "742c2f82a78d5657a781f78a53e98bf72c97637de73c90e301026d8adc30267f"
+      },
+      {
+        "path": "Patches/ghostty/0012-visionos.sh",
+        "sha256": "f0eca4e24ed11b3c96f0ef08787a6a8de0b7fd9d034c0d1ec114138e250bd136"
+      },
+      {
+        "path": "Patches/ghostty/0013-host-toolchain.sh",
+        "sha256": "5fa70a940f85433fbe279d97f18d614286e0243ab835df54c941d60fd5c586f6"
+      },
+      {
+        "path": "Patches/ghostty/0014-preserve-sync-on-resize.sh",
+        "sha256": "c698018c8d04ffd23be49bf2f470d2bbf0e6dfb2ac6c30d4062fcf6b51795b92"
+      },
+      {
+        "path": "Patches/ghostty/0015-hold-frame-for-prompt-redraw.sh",
+        "sha256": "b7146ddbddade5792c0c417ebf12cfc48bcde1da72792765d59411bc172b19a4"
+      },
+      {
+        "path": "Patches/ghostty/0016-maccatalyst.sh",
+        "sha256": "1b3a217db2851c024bb167d5868f96498cf11b0bdda0101f662a638eb7c3912a"
+      },
+      {
+        "path": "Patches/ghostty/0017-zig-pkg-apple-targets.sh",
+        "sha256": "d0a5cadc692d4fffc2efc6101d31bf120a5102a3092a16b6072aff8ec1a09c55"
+      },
+      {
+        "path": "Patches/ghostty/0018-screen-text-history.sh",
+        "sha256": "24c44fff0df62cf46c829a1bffc5d65dd6c7c8562568194d04d806655fa14d86"
+      },
+      {
+        "path": "Patches/ghostty/0019-cursor-timer-focus-and-blink.patch",
+        "sha256": "ad4096ab2e837ccf4e4195b835dfacb3cf75b6382ba6e7ecb741a69620745cc9"
+      },
+      {
+        "path": "Patches/ghostty/0020-selection-viewport.sh",
+        "sha256": "d214d4b9d8fad0b3ea361b12a9feca45c23edef56a2076247b3fa24a62ef5f7c"
+      },
+      {
+        "path": "Patches/ghostty/0021-no-libintl.sh",
+        "sha256": "992584c5afa1bb96505abbe1d004f833757544fc33cf1076a6e0b0856de1773a"
+      }
+    ],
+    "buildInputs": [
+      {
+        "path": "Ghostty.ref",
+        "sha256": "b8e4cfb7632fc04d46a27f9689bffb497caed93ed5227f8990cf8e497e888dc9"
+      },
+      {
+        "path": "Ghostty.build",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+      },
+      {
+        "path": "Script/build-ghostty.sh",
+        "sha256": "f1ff0c4c5745262e8e4c4ff9c6bb23bf6c01223edd3ff02f6a48f7c1cf335990"
+      },
+      {
+        "path": "Script/build-platform.sh",
+        "sha256": "9432c445b10f4db450b6aa7f962ba34b23b952190b3cd87bf81d8b91c89a580f"
+      },
+      {
+        "path": "Script/merge-xcframework.sh",
+        "sha256": "2e95c9bd815a09c8eb692650729cdd4f83cf1e1e582665e5a5884b645d29ada6"
+      },
+      {
+        "path": "Script/verify-xcframework.sh",
+        "sha256": "911c0a35b645a28231e6794baaa284cde33424b0161e5adff6852863110243ea"
+      }
+    ],
+    "engineChanges": [
+      {
+        "path": "build.zig",
+        "sha256": "fc5891ecd0a716c24b427424b163176c26d387b75b9ea498aa315fb24ce7215f"
+      },
+      {
+        "path": "include/ghostty.h",
+        "sha256": "fe304f691877a6eeb99c821b27fa1b8506585f0316167a0cde298bceb5e33d48"
+      },
+      {
+        "path": "pkg/apple-sdk/build.zig",
+        "sha256": "7d0b1c5d4badb401df11379db9010c2c4d22469d4ff9cded972cbca313dd4c80"
+      },
+      {
+        "path": "pkg/apple-sdk/native_link.zig",
+        "sha256": "e460eea9cc8390bc4c3aa921d57795066a94c47f0941bff100174c6bc2ff9f4d"
+      },
+      {
+        "path": "pkg/highway/build.zig",
+        "sha256": "37db39982a038d82977688c024470873bcd102ee6390b938874f9658100100ec"
+      },
+      {
+        "path": "pkg/macos/build.zig",
+        "sha256": "3c15c0dbae03b936c3edea00832071cade0b570e9cae398e8b44a0a3cd3626b2"
+      },
+      {
+        "path": "pkg/macos/iosurface/iosurface.zig",
+        "sha256": "110edffcd0d9272f1583ad669394e94f39b886410f530b1329e5750412aa0630"
+      },
+      {
+        "path": "pkg/simdutf/build.zig",
+        "sha256": "225333fe8e1cd35c909114c150c943522b7233d8e3190949bedce06c753ea20c"
+      },
+      {
+        "path": "src/Command.zig",
+        "sha256": "e1469bd98ad4397b2947ac720fc88bdd77ccf2982315fb298ef98e3fcc2b7b1d"
+      },
+      {
+        "path": "src/Surface.zig",
+        "sha256": "c8e3679a50c528e3200b792b55a0b0088dec17a15f2d589fd2997105b7754809"
+      },
+      {
+        "path": "src/apprt/embedded.zig",
+        "sha256": "1164acc0700f5a96fa2b327f4cd46241b4181a9be5a78e554f8703b145a3c096"
+      },
+      {
+        "path": "src/apprt/surface.zig",
+        "sha256": "30adcd87fd2ab4cc7f4cf05277ed2ea1024c9d132ae733bd66799e0903eb0bff"
+      },
+      {
+        "path": "src/build/Config.zig",
+        "sha256": "a743ffeb97a949200d52c81ec858568a130c79725a0691e8de7ca6ef116a73e2"
+      },
+      {
+        "path": "src/build/GhosttyFrameData.zig",
+        "sha256": "975e89e755ce36dfb62ba223dfbc6f4699380ac79217686a3dc212a43349144a"
+      },
+      {
+        "path": "src/build/LibtoolStep.zig",
+        "sha256": "b8e31c099b141f692ff6fb5b02a4a62513bc1d4a2e528c1b2a4b0377879cb7f7"
+      },
+      {
+        "path": "src/build/MetallibStep.zig",
+        "sha256": "6b2fcf61753e365fbdff19a74ef6997b4acd397676a71ddde5ed30b42d4b61c4"
+      },
+      {
+        "path": "src/build/SharedDeps.zig",
+        "sha256": "79d9fe6c1de0e245d87dbf3fd1f2852104d214cb64d2ea857f7536382b7cecba"
+      },
+      {
+        "path": "src/build/framegen/framedata.compressed",
+        "sha256": "cda4389141fa7a180dd78b7c8f6742c118273ef7bd3e449ef322a9e85e3dc8c6"
+      },
+      {
+        "path": "src/build_config.zig",
+        "sha256": "794a348c80d0ff6485d80e6ef14ec4c758319721bfc45b75efa7d83461cce6d3"
+      },
+      {
+        "path": "src/cli/tui.zig",
+        "sha256": "6ee9b86bac9a77580cfbe58a3131b198ddc7d5d10046f9e1a9ba69ed6407327f"
+      },
+      {
+        "path": "src/config/theme.zig",
+        "sha256": "c4d7736a236651558035d7b3db9556aaa27a5ea993f8d3da09260f6fd82c6f27"
+      },
+      {
+        "path": "src/font/shaper/coretext.zig",
+        "sha256": "77ad9e64cabf3c6a2ef41596a26d46aa4bc65f04bf8041195edad24b7bc88a8e"
+      },
+      {
+        "path": "src/global.zig",
+        "sha256": "d9ccfd17ecc94c2b4c951ceb3553baad84f131559d81a60f8f271b2f0d6c3bfe"
+      },
+      {
+        "path": "src/input/key.zig",
+        "sha256": "f7629cae95f5285a3f9a9f5bc9b3e056a6f317ff0823798c07a1d42d72e53583"
+      },
+      {
+        "path": "src/input/keycodes.zig",
+        "sha256": "254c3f679215e88267b07335e653e8ed0061bf14c0497bf03baf5e59bf14d99d"
+      },
+      {
+        "path": "src/inspector/main.zig",
+        "sha256": "c8ac451678f5a935103004a4c5529a337101671b3b394e5ea5071920d2aa8e71"
+      },
+      {
+        "path": "src/os/cf_release_thread.zig",
+        "sha256": "6aceb3c44658a6b57269280c5ce2a09f6fc862f2b7b3910b3e1d84f9246794f6"
+      },
+      {
+        "path": "src/os/desktop.zig",
+        "sha256": "4f9264cada2598bba12cbbea6f954e7065e9d83139852160d5b1eef239d5f7f1"
+      },
+      {
+        "path": "src/os/homedir.zig",
+        "sha256": "e29cf9ea56780dd7157db4a374bf9777f6b082269681e2012b3eeeae1ba280c1"
+      },
+      {
+        "path": "src/os/open.zig",
+        "sha256": "ad9dabace18f8c872fd446f18d79c35b12926336043c72d10e8c25fa873c5ffb"
+      },
+      {
+        "path": "src/pty.zig",
+        "sha256": "ce8ffadc7bf4fd11c1ccf1d9257814497621c944484a163f7c3c43816abfbaa8"
+      },
+      {
+        "path": "src/renderer/Metal.zig",
+        "sha256": "c3eb18f3dfa9c37ae9e2f64fb0e2d5005d9b50958c08883d112efaf7b9106e2a"
+      },
+      {
+        "path": "src/renderer/Thread.zig",
+        "sha256": "4ba0934e67f57d6de1eab7d76bd607920ddc646748aea28edca67d0242ed3333"
+      },
+      {
+        "path": "src/renderer/generic.zig",
+        "sha256": "e1cda54aaa0ec7afd4a494b080e8b66702d167c34e6ee19acd3b86e196f0eb3f"
+      },
+      {
+        "path": "src/renderer/metal/Device.zig",
+        "sha256": "39638389b3afe6167ed42491d3786734ccba4d304fc0f20f4b864183132f42c9"
+      },
+      {
+        "path": "src/renderer/metal/IOSurfaceLayer.zig",
+        "sha256": "6490065d0cc319106cfcd12b27ca78fadf5a969e75a51a63194901f45683ba69"
+      },
+      {
+        "path": "src/renderer/shadertoy.zig",
+        "sha256": "38e0e50600a150edaef73eb59df2591b9648028e28565fe2cf2a6efd7249e3dd"
+      },
+      {
+        "path": "src/terminal/Screen.zig",
+        "sha256": "1e1053d417be554c1b8fb0520465d3bfb48b22658d5f594b45107181d496fff6"
+      },
+      {
+        "path": "src/terminal/Terminal.zig",
+        "sha256": "293c952b41fd811297b34804de3b0d59edd6336ebf493c267dae47673e70e5c8"
+      },
+      {
+        "path": "src/terminal/c/terminal.zig",
+        "sha256": "0a810498c4815548d7e3b49b03cf44bbdf5d43a90caca6b8cddfc2b82fcb44ca"
+      },
+      {
+        "path": "src/terminal/stream_terminal.zig",
+        "sha256": "505147c6202f327a05a7dd01c91adfc8b6d1ac7255d8c9cc57b5e11c62032745"
+      },
+      {
+        "path": "src/termio.zig",
+        "sha256": "f3ae907f7e16cbf1cbf356befe760b7f4677729cbf445733c861b2f24d5f62af"
+      },
+      {
+        "path": "src/termio/HostManaged.zig",
+        "sha256": "6b79e276bb7e93a87a80df4e760614d866e03e3a3f757451feb0dc03c1d951ad"
+      },
+      {
+        "path": "src/termio/Termio.zig",
+        "sha256": "efecfc1b8b87c21a7358dbc3ada75c7b8680a4910f254b161b57a0ac919c6f9c"
+      },
+      {
+        "path": "src/termio/backend.zig",
+        "sha256": "38c7880a2c90640ecbca7baa3edd86a3d85d570c6b85da48cfa676ff16297439"
+      },
+      {
+        "path": "src/termio/message.zig",
+        "sha256": "4732149f032d33a31f4f222a1938edd3d75a24b5ca6763cf9feeff4762de66b1"
+      },
+      {
+        "path": "src/termio/stream_handler.zig",
+        "sha256": "49f71e9f757eb6c353c6ed2617b834c04543607d3f53a19e2bfef6471f0fa470"
+      }
+    ],
+    "build": {
+      "platform": "macos",
+      "architectures": [
+        "arm64",
+        "x86_64"
+      ],
+      "optimize": "fast",
+      "parallelJobs": 2,
+      "flags": [
+        "-Dapp-runtime=none",
+        "-Demit-exe=false",
+        "-Demit-xcframework=false",
+        "-Demit-macos-app=false",
+        "-Demit-docs=false",
+        "-Dsentry=false",
+        "-Dcustom-shaders=false",
+        "-Dinspector=false",
+        "-Di18n=false"
+      ]
+    }
+  },
+  "local_provenance_sha256": "cc9f55a03342c3f3ecf454171214c585f123425a154495328adb69103af49076"
+}

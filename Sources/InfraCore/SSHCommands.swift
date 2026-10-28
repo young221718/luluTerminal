@@ -17,6 +17,7 @@ public enum SSHCommandBuilder {
         guard server.kind == .ssh else { throw CoreError.invalidProfile("Local connections must not enter SSH commands.") }
         try server.validate()
         guard server.accounts.contains(account) else { throw CoreError.invalidProfile("Account does not belong to this server.") }
+        guard account.authMethod != .pendingKey else { throw CoreError.invalidProfile("새 SSH 키 자동 설정을 완료하세요.") }
         if account.authMethod == .managedKey {
             guard let reference = account.managedKey else { throw CoreError.invalidProfile("SSH 키 설정이 필요합니다.") }
             try SSHManagedKeys.validate(reference: reference, server: server, account: account)

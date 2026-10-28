@@ -1,0 +1,1018 @@
+diff --git a/Localization/Localizable.xcstrings b/Localization/Localizable.xcstrings
+index df219b9..2d55a64 100644
+--- a/Localization/Localizable.xcstrings
++++ b/Localization/Localizable.xcstrings
+@@ -1,6 +1,120 @@
+ {
+   "sourceLanguage": "en",
+   "strings": {
++    "Cancel": {
++      "comment": "Cancels a potentially unsafe terminal drop.",
++      "extractionState": "manual",
++      "localizations": {
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "إلغاء"
++          }
++        },
++        "bn": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "বাতিল"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Abbrechen"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Cancelar"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Annuler"
++          }
++        },
++        "hi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "रद्द करें"
++          }
++        },
++        "id": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Batal"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Annulla"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "キャンセル"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "취소"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Cancelar"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Отмена"
++          }
++        },
++        "sw": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Ghairi"
++          }
++        },
++        "tr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "İptal"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Hủy"
++          }
++        },
++        "yo": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Fagilé"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "取消"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "取消"
++          }
++        }
++      }
++    },
+     "Copy": {
+       "comment": "Edit menu action that copies the selected terminal text.",
+       "extractionState": "manual",
+@@ -229,6 +343,120 @@
+         }
+       }
+     },
++    "Paste dropped text?": {
++      "comment": "Title of the warning before a potentially unsafe terminal drop.",
++      "extractionState": "manual",
++      "localizations": {
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "هل تريد لصق النص المسحوب؟"
++          }
++        },
++        "bn": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "টেনে আনা লেখা পেস্ট করবেন?"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Abgelegten Text einfügen?"
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "¿Pegar el texto arrastrado?"
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Coller le texte déposé ?"
++          }
++        },
++        "hi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "खींचा गया पाठ पेस्ट करें?"
++          }
++        },
++        "id": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Tempel teks yang dijatuhkan?"
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Incollare il testo trascinato?"
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ドロップしたテキストをペーストしますか？"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "드롭한 텍스트를 붙여넣을까요?"
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Colar o texto arrastado?"
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Вставить перетаскиваемый текст?"
++          }
++        },
++        "sw": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Bandika maandishi yaliyodondoshwa?"
++          }
++        },
++        "tr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Sürüklenen metin yapıştırılsın mı?"
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Dán văn bản đã thả?"
++          }
++        },
++        "yo": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Ṣe kí a lẹ ọrọ tí a fà síbí?"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "粘贴拖入的文本？"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "貼上拖入的文字？"
++          }
++        }
++      }
++    },
+     "Select": {
+       "comment": "Edit menu action that starts selecting terminal text at the touch.",
+       "extractionState": "manual",
+@@ -456,6 +684,120 @@
+           }
+         }
+       }
++    },
++    "Text contains line breaks or terminal control sequences. Pasting may run commands.": {
++      "comment": "Warning that explicitly confirming a terminal drop may execute commands.",
++      "extractionState": "manual",
++      "localizations": {
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "يحتوي النص على فواصل أسطر أو تسلسلات تحكم للطرفية. قد يؤدي اللصق إلى تشغيل أوامر."
++          }
++        },
++        "bn": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "লেখায় নতুন লাইন বা টার্মিনাল নিয়ন্ত্রণ ক্রম রয়েছে। পেস্ট করলে কমান্ড চলতে পারে।"
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Der Text enthält Zeilenumbrüche oder Terminal-Steuersequenzen. Beim Einfügen können Befehle ausgeführt werden."
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "El texto contiene saltos de línea o secuencias de control del terminal. Al pegarlo podrían ejecutarse comandos."
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Le texte contient des sauts de ligne ou des séquences de contrôle du terminal. Le coller peut exécuter des commandes."
++          }
++        },
++        "hi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "पाठ में नई पंक्तियाँ या टर्मिनल नियंत्रण अनुक्रम हैं। पेस्ट करने से कमांड चल सकते हैं।"
++          }
++        },
++        "id": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Teks berisi pergantian baris atau urutan kontrol terminal. Menempel dapat menjalankan perintah."
++          }
++        },
++        "it": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Il testo contiene interruzioni di riga o sequenze di controllo del terminale. Incollandolo potrebbero essere eseguiti comandi."
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "テキストに改行またはターミナル制御シーケンスが含まれています。ペーストするとコマンドが実行される可能性があります。"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "텍스트에 줄바꿈 또는 터미널 제어 시퀀스가 있습니다. 붙여넣으면 명령이 실행될 수 있습니다."
++          }
++        },
++        "pt-BR": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "O texto contém quebras de linha ou sequências de controle do terminal. Colar pode executar comandos."
++          }
++        },
++        "ru": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Текст содержит переводы строк или управляющие последовательности терминала. Вставка может выполнить команды."
++          }
++        },
++        "sw": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Maandishi yana mistari mipya au mfuatano wa udhibiti wa terminal. Kubandika kunaweza kutekeleza amri."
++          }
++        },
++        "tr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Metin satır sonları veya terminal denetim dizileri içeriyor. Yapıştırmak komutları çalıştırabilir."
++          }
++        },
++        "vi": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Văn bản chứa dấu xuống dòng hoặc chuỗi điều khiển terminal. Việc dán có thể chạy lệnh."
++          }
++        },
++        "yo": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "Ọrọ náà ní àwọn ìlà tuntun tàbí àwọn ọ̀wọ́ ìṣàkóso terminal. Lílọ̀ ọ́ lè mú kí àwọn àṣẹ ṣiṣẹ́."
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "文本包含换行符或终端控制序列。粘贴可能会执行命令。"
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "文字包含換行字元或終端機控制序列。貼上可能會執行指令。"
++          }
++        }
++      }
+     }
+   },
+   "version": "1.0"
+diff --git a/Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Drop.swift b/Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Drop.swift
+index b67a5de..e94d9bf 100644
+--- a/Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Drop.swift
++++ b/Sources/GhosttyTerminal/Platform/AppKit/AppTerminalView+Drop.swift
+@@ -86,20 +86,21 @@
+         }
+ 
+         override open func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
++            guard let surface else { return false }
+             let pasteboard = sender.draggingPasteboard
+             switch dropPayload(from: pasteboard) {
+             case let .text(text):
+                 TerminalDebugLog.log(.input, "drop text bytes=\(text.utf8.count)")
+-                return surface?.paste(text: text) ?? false
++                return pasteDroppedText(text, on: surface)
+             case let .image(type):
+                 guard let (data, utType) = Self.encodedImage(in: pasteboard, type: type) else { return false }
+-                TerminalFileStaging.stage(data: data, name: "image", type: utType) { [weak self] path in
+-                    guard let self, let path else {
++                TerminalFileStaging.stage(data: data, name: "image", type: utType) { [weak self, weak surface] path in
++                    guard let self, let surface, self.surface === surface, let path else {
+                         TerminalDebugLog.log(.input, "drop skipped: the image could not be staged")
+                         return
+                     }
+                     TerminalDebugLog.log(.input, "drop image bytes=\(data.count)")
+-                    _ = surface?.paste(text: path)
++                    _ = pasteDroppedText(path, on: surface)
+                 }
+                 return true
+             case nil:
+@@ -107,6 +108,31 @@
+             }
+         }
+ 
++        private func pasteDroppedText(_ text: String, on surface: TerminalSurface) -> Bool {
++            TerminalDropPaste.deliver(text, requestConfirmation: { [weak self] request in
++                // No modal fallback: an unattached view or another sheet must not approve a drop.
++                guard let window = self?.window, window.attachedSheet == nil else {
++                    request.respond(allow: false)
++                    return
++                }
++                let alert = NSAlert()
++                alert.alertStyle = .warning
++                alert.messageText = String(localized: "Paste dropped text?", bundle: .module)
++                alert.informativeText = String(
++                    localized: "Text contains line breaks or terminal control sequences. Pasting may run commands.",
++                    bundle: .module,
++                )
++                alert.addButton(withTitle: String(localized: "Cancel", bundle: .module)).keyEquivalent = "\r"
++                alert.addButton(withTitle: String(localized: "Paste", bundle: .module)).keyEquivalent = ""
++                alert.beginSheetModal(for: window) { response in
++                    request.respond(allow: response == .alertSecondButtonReturn)
++                }
++            }, paste: { [weak self, weak surface] text in
++                guard let self, let surface, self.surface === surface else { return false }
++                return surface.paste(text: text)
++            })
++        }
++
+         static func encodedImage(
+             in pasteboard: NSPasteboard,
+             type: NSPasteboard.PasteboardType,
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/ar.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/ar.lproj/Localizable.strings
+index 04334da..f889e71 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/ar.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/ar.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>إلغاء</string>
+ 	<key>Copy</key>
+ 	<string>نسخ</string>
+ 	<key>Paste</key>
+ 	<string>لصق</string>
++	<key>Paste dropped text?</key>
++	<string>هل تريد لصق النص المسحوب؟</string>
+ 	<key>Select</key>
+ 	<string>تحديد</string>
+ 	<key>Select All</key>
+ 	<string>تحديد الكل</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>يحتوي النص على فواصل أسطر أو تسلسلات تحكم للطرفية. قد يؤدي اللصق إلى تشغيل أوامر.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/bn.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/bn.lproj/Localizable.strings
+index 12e2443..f1b949c 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/bn.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/bn.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>বাতিল</string>
+ 	<key>Copy</key>
+ 	<string>কপি করুন</string>
+ 	<key>Paste</key>
+ 	<string>পেস্ট করুন</string>
++	<key>Paste dropped text?</key>
++	<string>টেনে আনা লেখা পেস্ট করবেন?</string>
+ 	<key>Select</key>
+ 	<string>নির্বাচন করুন</string>
+ 	<key>Select All</key>
+ 	<string>সব নির্বাচন করুন</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>লেখায় নতুন লাইন বা টার্মিনাল নিয়ন্ত্রণ ক্রম রয়েছে। পেস্ট করলে কমান্ড চলতে পারে।</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/de.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/de.lproj/Localizable.strings
+index 4dc43dc..e039c53 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/de.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/de.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Abbrechen</string>
+ 	<key>Copy</key>
+ 	<string>Kopieren</string>
+ 	<key>Paste</key>
+ 	<string>Einsetzen</string>
++	<key>Paste dropped text?</key>
++	<string>Abgelegten Text einfügen?</string>
+ 	<key>Select</key>
+ 	<string>Auswählen</string>
+ 	<key>Select All</key>
+ 	<string>Alles auswählen</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Der Text enthält Zeilenumbrüche oder Terminal-Steuersequenzen. Beim Einfügen können Befehle ausgeführt werden.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/en.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/en.lproj/Localizable.strings
+index 1ecf6f2..cba5964 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/en.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/en.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Cancel</string>
+ 	<key>Copy</key>
+ 	<string>Copy</string>
+ 	<key>Paste</key>
+ 	<string>Paste</string>
++	<key>Paste dropped text?</key>
++	<string>Paste dropped text?</string>
+ 	<key>Select</key>
+ 	<string>Select</string>
+ 	<key>Select All</key>
+ 	<string>Select All</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Text contains line breaks or terminal control sequences. Pasting may run commands.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/es.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/es.lproj/Localizable.strings
+index c0aea39..05f969a 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/es.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/es.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Cancelar</string>
+ 	<key>Copy</key>
+ 	<string>Copiar</string>
+ 	<key>Paste</key>
+ 	<string>Pegar</string>
++	<key>Paste dropped text?</key>
++	<string>¿Pegar el texto arrastrado?</string>
+ 	<key>Select</key>
+ 	<string>Seleccionar</string>
+ 	<key>Select All</key>
+ 	<string>Seleccionar todo</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>El texto contiene saltos de línea o secuencias de control del terminal. Al pegarlo podrían ejecutarse comandos.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/fr.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/fr.lproj/Localizable.strings
+index 243256e..1f68fca 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/fr.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/fr.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Annuler</string>
+ 	<key>Copy</key>
+ 	<string>Copier</string>
+ 	<key>Paste</key>
+ 	<string>Coller</string>
++	<key>Paste dropped text?</key>
++	<string>Coller le texte déposé ?</string>
+ 	<key>Select</key>
+ 	<string>Sélectionner</string>
+ 	<key>Select All</key>
+ 	<string>Tout sélectionner</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Le texte contient des sauts de ligne ou des séquences de contrôle du terminal. Le coller peut exécuter des commandes.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/hi.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/hi.lproj/Localizable.strings
+index 537b451..30b5b92 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/hi.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/hi.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>रद्द करें</string>
+ 	<key>Copy</key>
+ 	<string>कॉपी करें</string>
+ 	<key>Paste</key>
+ 	<string>पेस्ट करें</string>
++	<key>Paste dropped text?</key>
++	<string>खींचा गया पाठ पेस्ट करें?</string>
+ 	<key>Select</key>
+ 	<string>चुनें</string>
+ 	<key>Select All</key>
+ 	<string>सभी चुनें</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>पाठ में नई पंक्तियाँ या टर्मिनल नियंत्रण अनुक्रम हैं। पेस्ट करने से कमांड चल सकते हैं।</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/id.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/id.lproj/Localizable.strings
+index fe4b885..e0606d0 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/id.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/id.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Batal</string>
+ 	<key>Copy</key>
+ 	<string>Salin</string>
+ 	<key>Paste</key>
+ 	<string>Tempel</string>
++	<key>Paste dropped text?</key>
++	<string>Tempel teks yang dijatuhkan?</string>
+ 	<key>Select</key>
+ 	<string>Pilih</string>
+ 	<key>Select All</key>
+ 	<string>Pilih Semua</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Teks berisi pergantian baris atau urutan kontrol terminal. Menempel dapat menjalankan perintah.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/it.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/it.lproj/Localizable.strings
+index 8e94b7b..593e953 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/it.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/it.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Annulla</string>
+ 	<key>Copy</key>
+ 	<string>Copia</string>
+ 	<key>Paste</key>
+ 	<string>Incolla</string>
++	<key>Paste dropped text?</key>
++	<string>Incollare il testo trascinato?</string>
+ 	<key>Select</key>
+ 	<string>Seleziona</string>
+ 	<key>Select All</key>
+ 	<string>Seleziona tutto</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Il testo contiene interruzioni di riga o sequenze di controllo del terminale. Incollandolo potrebbero essere eseguiti comandi.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/ja.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/ja.lproj/Localizable.strings
+index 5ff58af..4ca385a 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/ja.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/ja.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>キャンセル</string>
+ 	<key>Copy</key>
+ 	<string>コピー</string>
+ 	<key>Paste</key>
+ 	<string>ペースト</string>
++	<key>Paste dropped text?</key>
++	<string>ドロップしたテキストをペーストしますか？</string>
+ 	<key>Select</key>
+ 	<string>選択</string>
+ 	<key>Select All</key>
+ 	<string>すべてを選択</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>テキストに改行またはターミナル制御シーケンスが含まれています。ペーストするとコマンドが実行される可能性があります。</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/ko.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/ko.lproj/Localizable.strings
+index fcfff0c..c52d7ab 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/ko.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/ko.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>취소</string>
+ 	<key>Copy</key>
+ 	<string>복사</string>
+ 	<key>Paste</key>
+ 	<string>붙여넣기</string>
++	<key>Paste dropped text?</key>
++	<string>드롭한 텍스트를 붙여넣을까요?</string>
+ 	<key>Select</key>
+ 	<string>선택</string>
+ 	<key>Select All</key>
+ 	<string>모두 선택</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>텍스트에 줄바꿈 또는 터미널 제어 시퀀스가 있습니다. 붙여넣으면 명령이 실행될 수 있습니다.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/pt-BR.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/pt-BR.lproj/Localizable.strings
+index b5902f3..1c6590b 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/pt-BR.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/pt-BR.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Cancelar</string>
+ 	<key>Copy</key>
+ 	<string>Copiar</string>
+ 	<key>Paste</key>
+ 	<string>Colar</string>
++	<key>Paste dropped text?</key>
++	<string>Colar o texto arrastado?</string>
+ 	<key>Select</key>
+ 	<string>Selecionar</string>
+ 	<key>Select All</key>
+ 	<string>Selecionar Tudo</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>O texto contém quebras de linha ou sequências de controle do terminal. Colar pode executar comandos.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/ru.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/ru.lproj/Localizable.strings
+index f0feb07..36bc6ea 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/ru.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/ru.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Отмена</string>
+ 	<key>Copy</key>
+ 	<string>Скопировать</string>
+ 	<key>Paste</key>
+ 	<string>Вставить</string>
++	<key>Paste dropped text?</key>
++	<string>Вставить перетаскиваемый текст?</string>
+ 	<key>Select</key>
+ 	<string>Выбрать</string>
+ 	<key>Select All</key>
+ 	<string>Выбрать все</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Текст содержит переводы строк или управляющие последовательности терминала. Вставка может выполнить команды.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/sw.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/sw.lproj/Localizable.strings
+index a11b777..71b028d 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/sw.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/sw.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Ghairi</string>
+ 	<key>Copy</key>
+ 	<string>Nakili</string>
+ 	<key>Paste</key>
+ 	<string>Bandika</string>
++	<key>Paste dropped text?</key>
++	<string>Bandika maandishi yaliyodondoshwa?</string>
+ 	<key>Select</key>
+ 	<string>Chagua</string>
+ 	<key>Select All</key>
+ 	<string>Chagua Zote</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Maandishi yana mistari mipya au mfuatano wa udhibiti wa terminal. Kubandika kunaweza kutekeleza amri.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/tr.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/tr.lproj/Localizable.strings
+index 7ddb4ed..a1b4532 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/tr.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/tr.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>İptal</string>
+ 	<key>Copy</key>
+ 	<string>Kopyala</string>
+ 	<key>Paste</key>
+ 	<string>Yapıştır</string>
++	<key>Paste dropped text?</key>
++	<string>Sürüklenen metin yapıştırılsın mı?</string>
+ 	<key>Select</key>
+ 	<string>Seç</string>
+ 	<key>Select All</key>
+ 	<string>Tümünü Seç</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Metin satır sonları veya terminal denetim dizileri içeriyor. Yapıştırmak komutları çalıştırabilir.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/vi.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/vi.lproj/Localizable.strings
+index fe77056..9cd80a4 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/vi.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/vi.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Hủy</string>
+ 	<key>Copy</key>
+ 	<string>Sao chép</string>
+ 	<key>Paste</key>
+ 	<string>Dán</string>
++	<key>Paste dropped text?</key>
++	<string>Dán văn bản đã thả?</string>
+ 	<key>Select</key>
+ 	<string>Chọn</string>
+ 	<key>Select All</key>
+ 	<string>Chọn tất cả</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Văn bản chứa dấu xuống dòng hoặc chuỗi điều khiển terminal. Việc dán có thể chạy lệnh.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/yo.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/yo.lproj/Localizable.strings
+index 1670d33..098165b 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/yo.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/yo.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>Fagilé</string>
+ 	<key>Copy</key>
+ 	<string>Dàkọ</string>
+ 	<key>Paste</key>
+ 	<string>Lẹ̀ mọ́</string>
++	<key>Paste dropped text?</key>
++	<string>Ṣe kí a lẹ ọrọ tí a fà síbí?</string>
+ 	<key>Select</key>
+ 	<string>Yan</string>
+ 	<key>Select All</key>
+ 	<string>Yan Gbogbo Rẹ̀</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>Ọrọ náà ní àwọn ìlà tuntun tàbí àwọn ọ̀wọ́ ìṣàkóso terminal. Lílọ̀ ọ́ lè mú kí àwọn àṣẹ ṣiṣẹ́.</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/zh-Hans.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/zh-Hans.lproj/Localizable.strings
+index 15f4b6f..dfa2e94 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/zh-Hans.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/zh-Hans.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>取消</string>
+ 	<key>Copy</key>
+ 	<string>复制</string>
+ 	<key>Paste</key>
+ 	<string>粘贴</string>
++	<key>Paste dropped text?</key>
++	<string>粘贴拖入的文本？</string>
+ 	<key>Select</key>
+ 	<string>选择</string>
+ 	<key>Select All</key>
+ 	<string>全选</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>文本包含换行符或终端控制序列。粘贴可能会执行命令。</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Resources/Localization/zh-Hant.lproj/Localizable.strings b/Sources/GhosttyTerminal/Resources/Localization/zh-Hant.lproj/Localizable.strings
+index 7c6c409..a4ef0da 100644
+--- a/Sources/GhosttyTerminal/Resources/Localization/zh-Hant.lproj/Localizable.strings
++++ b/Sources/GhosttyTerminal/Resources/Localization/zh-Hant.lproj/Localizable.strings
+@@ -2,13 +2,19 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
++	<key>Cancel</key>
++	<string>取消</string>
+ 	<key>Copy</key>
+ 	<string>拷貝</string>
+ 	<key>Paste</key>
+ 	<string>貼上</string>
++	<key>Paste dropped text?</key>
++	<string>貼上拖入的文字？</string>
+ 	<key>Select</key>
+ 	<string>選取</string>
+ 	<key>Select All</key>
+ 	<string>全選</string>
++	<key>Text contains line breaks or terminal control sequences. Pasting may run commands.</key>
++	<string>文字包含換行字元或終端機控制序列。貼上可能會執行指令。</string>
+ </dict>
+ </plist>
+diff --git a/Sources/GhosttyTerminal/Platform/AppKit/TerminalDropPaste.swift b/Sources/GhosttyTerminal/Platform/AppKit/TerminalDropPaste.swift
+new file mode 100644
+index 0000000..3f7e98e
+--- /dev/null
++++ b/Sources/GhosttyTerminal/Platform/AppKit/TerminalDropPaste.swift
+@@ -0,0 +1,21 @@
++#if !canImport(UIKit) && canImport(AppKit)
++    import Foundation
++
++    /// Drop text bypasses libghostty's clipboard paste protection.
++    @MainActor
++    enum TerminalDropPaste {
++        static func deliver(
++            _ text: String,
++            requestConfirmation: (TerminalClipboardConfirmationRequest) -> Void,
++            paste: @escaping (String) -> Bool,
++        ) -> Bool {
++            guard text.utf8.contains(0x0A) || text.utf8.contains(0x0D) || text.contains("\u{1B}[201~") else {
++                return paste(text)
++            }
++            requestConfirmation(TerminalClipboardConfirmationRequest(contents: text, kind: .paste) { allowed in
++                if allowed { _ = paste(text) }
++            })
++            return true
++        }
++    }
++#endif
+diff --git a/Tests/GhosttyKitTest/Clipboard/TerminalDropPasteTests.swift b/Tests/GhosttyKitTest/Clipboard/TerminalDropPasteTests.swift
+new file mode 100644
+index 0000000..910ec34
+--- /dev/null
++++ b/Tests/GhosttyKitTest/Clipboard/TerminalDropPasteTests.swift
+@@ -0,0 +1,100 @@
++#if !canImport(UIKit) && canImport(AppKit)
++    import AppKit
++    import Foundation
++    @testable import GhosttyTerminal
++    import Testing
++
++    @Suite("TerminalDropPaste", .serialized)
++    @MainActor
++    struct TerminalDropPasteTests {
++        @Test(arguments: ["Worker: 04\nid\n", "first\rsecond", "a\r\nb", "a\u{1B}[201~b", "/tmp/image\nid.png"])
++        func `unsafe drop waits for explicit confirmation and keeps original text`(_ text: String) throws {
++            var request: TerminalClipboardConfirmationRequest?
++            var pasted: [String] = []
++            #expect(TerminalDropPaste.deliver(text, requestConfirmation: { request = $0 }, paste: {
++                pasted.append($0)
++                return true
++            }))
++            #expect(pasted.isEmpty)
++            let pending = try #require(request)
++            #expect(pending.kind == .paste)
++            #expect(Array(pending.contents.utf8) == Array(text.utf8))
++            pending.respond(allow: true)
++            pending.respond(allow: true)
++            #expect(pasted.count == 1)
++            #expect(pasted.first.map { Array($0.utf8) } == Array(text.utf8))
++        }
++
++        @Test
++        func `URL restoration and file paths reach the same confirmation gate`() throws {
++            let view = AppTerminalView(frame: .zero)
++            let inputs: [(String?, [URL])] = [
++                ("Worker: 04\nid\n", [URL(string: "Worker:%2004%0Aid%0A")!]),
++                (nil, [URL(fileURLWithPath: "/tmp/first\nid.txt")]),
++                (nil, [URL(fileURLWithPath: "/tmp/first\rid.txt"), URL(fileURLWithPath: "/tmp/second.txt")]),
++            ]
++            for (string, urls) in inputs {
++                let drag = FakeDrag()
++                defer { drag.release() }
++                drag.pasteboard.writeObjects(urls.map { $0 as NSURL })
++                if let string { drag.pasteboard.setString(string, forType: .string) }
++                guard case let .text(text) = view.dropPayload(from: drag.pasteboard) else {
++                    Issue.record("Missing dropped text")
++                    continue
++                }
++                var request: TerminalClipboardConfirmationRequest?
++                var pasted: [String] = []
++                #expect(TerminalDropPaste.deliver(text, requestConfirmation: { request = $0 }, paste: {
++                    pasted.append($0)
++                    return true
++                }))
++                #expect(pasted.isEmpty)
++                let pending = try #require(request)
++                #expect(Array(pending.contents.utf8) == Array(text.utf8))
++                pending.respond(allow: true)
++                #expect(pasted.first.map { Array($0.utf8) } == Array(text.utf8))
++            }
++        }
++
++        @Test(arguments: TerminalLocalizationTests.languages)
++        func `drop warning and cancel action are translated`(language: String) throws {
++            for key in [
++                "Paste dropped text?",
++                "Text contains line breaks or terminal control sequences. Pasting may run commands.",
++                "Cancel",
++            ] {
++                let value = try TerminalLocalizationTests.translation(of: key, in: language)
++                #expect(value != nil && value != key, "\(language) lacks \(key)")
++            }
++        }
++
++        @Test
++        func `cancel or unanswered confirmation sends no text`() {
++            for answer in [false, nil] as [Bool?] {
++                var request: TerminalClipboardConfirmationRequest?
++                var pasted = false
++                #expect(TerminalDropPaste.deliver("harmless\rid\r", requestConfirmation: { request = $0 }, paste: { _ in
++                    pasted = true
++                    return true
++                }))
++                #expect(!pasted)
++                if let answer { request?.respond(allow: answer) }
++                request = nil
++                #expect(!pasted)
++            }
++        }
++
++        @Test(arguments: ["git status", "한글 e\u{301} 😀", "https://example.com/a%0Ab", "/tmp/drop\\ test.txt"])
++        func `single line bypasses confirmation without modifying text`(_ text: String) {
++            var pasted: [String] = []
++            let result = TerminalDropPaste.deliver(text, requestConfirmation: { _ in
++                Issue.record("Safe drop requested confirmation")
++            }, paste: {
++                pasted.append($0)
++                return false
++            })
++            #expect(!result)
++            #expect(pasted == [text])
++        }
++    }
++#endif

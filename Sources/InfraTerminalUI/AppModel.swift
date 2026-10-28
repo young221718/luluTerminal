@@ -196,7 +196,7 @@ public final class AppModel: ObservableObject {
 
     private func recoveryServer(for tab: TerminalTab) -> ServerProfile? {
         guard let server = workspace.servers.first(where: { $0.id == tab.serverID && $0.kind == .ssh }),
-              server.accounts.contains(where: { $0.id == tab.accountID }) else { return nil }
+              server.accounts.contains(where: { $0.id == tab.accountID && $0.authMethod != .pendingKey }) else { return nil }
         return server
     }
 
@@ -207,7 +207,7 @@ public final class AppModel: ObservableObject {
                 let account = candidate.accounts[index]
                 guard let previous = old.accounts.first(where: { $0.id == account.id }), previous.username != account.username else { continue }
                 candidate.accounts[index].id = UUID()
-                candidate.accounts[index].authMethod = .system
+                candidate.accounts[index].authMethod = .pendingKey
                 candidate.accounts[index].managedKey = nil
                 if candidate.monitorAccountID == account.id { candidate.monitorAccountID = candidate.accounts[index].id }
             }
@@ -531,6 +531,10 @@ public final class AppModel: ObservableObject {
             guard !persistenceBlocked, recoveryServer(for: tab) == server, interruptedConnections[tabID] == server,
                   pausedAuthentication[AccountKey(serverID: server.id, accountID: account.id)] == nil else { return nil }
         } else { interruptedConnections[tabID] = nil }
+        guard account.authMethod != .pendingKey || server.kind == .local else {
+            connections[tabID] = .authenticationRequired("새 SSH 키 자동 설정을 완료하세요.")
+            return nil
+        }
         guard connections[tabID] != .checking else { return nil }
         let key = AccountKey(serverID: server.id, accountID: account.id)
         let managedKey = server.kind == .ssh && account.authMethod == .managedKey
@@ -710,7 +714,7 @@ public final class AppModel: ObservableObject {
     private func isAuthenticationUnavailable(server: ServerProfile) -> Bool {
         guard let account = server.accounts.first(where: { $0.id == server.monitorAccountID }) else { return false }
         let key = AccountKey(serverID: server.id, accountID: account.id)
-        return pausedAuthentication[key] != nil || activeAuthentication[key] != nil
+        return account.authMethod == .pendingKey || pausedAuthentication[key] != nil || activeAuthentication[key] != nil
     }
 
     private func poll(_ id: UUID, at time: Date) {
@@ -718,7 +722,7 @@ public final class AppModel: ObservableObject {
         let key = AccountKey(serverID: server.id, accountID: account.id)
         let managedKey = account.authMethod == .managedKey
         let protectedAuthentication = managedKey
-        guard !protectedAuthentication || !isAuthenticationUnavailable(server: server) else { return }
+        guard account.authMethod != .pendingKey, !protectedAuthentication || !isAuthenticationUnavailable(server: server) else { return }
         let token = UUID()
         pollTokens[id] = token
         if protectedAuthentication { activeAuthentication[key] = token }

@@ -71,3 +71,5 @@ open 'dist/Infra Terminal.app'
 개인 키·비밀번호 원문과 실사용 서버 프로필은 저장소에 포함하지 않는다. 기존 키 인증은 사용자의 OpenSSH 설정을 따른다. 앱에는 비밀번호 저장소·Keychain API·인증 도우미·askpass 경로가 없다. 앱이 실행하는 모든 SSH에 `UseKeychain=no`, `AddKeysToAgent=no`, `SSH_ASKPASS_REQUIRE=never`를 적용한다. 최초 키 등록 비밀번호는 앱의 보안 입력칸에서 한 번 받아 분리된 인증 터미널 채널로만 전달한다. 작업 완료·취소 후 입력값을 비우며 비밀번호를 저장하지 않는다. 기존 암호화 키의 암호는 네이티브 잠금 해제 터미널에 입력한다. 설정된 원격 서버와 로컬 셸은 해당 사용자 권한으로 동작하므로 신뢰하는 대상만 연결한다. [보안 범위](SECURITY.md)를 참고한다.
 
 앱 코드와 올루루 자산에는 아직 별도 재사용 라이선스를 지정하지 않았다. Ghostty 및 함께 배포하는 라이브러리·폰트의 라이선스와 원문 고지는 [THIRD_PARTY](docs/THIRD_PARTY.ghostty14.md)에 정리하며 빌드한 앱에도 포함한다.
+
+제품별 시안과 브랜딩 자료는 [디자인 목차](design/README.md)에서 찾는다.

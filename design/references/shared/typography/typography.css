@@ -1,0 +1,58 @@
+@font-face {
+  font-family: "Pretendard Variable";
+  src: url("./fonts/PretendardVariable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Pretendard Variable", sans-serif;
+  --font-terminal: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: -0.01em;
+  line-height: 1.6;
+}
+
+button, input, select, textarea, code, pre { font: inherit; }
+
+h1, h2, h3, h4, h5, h6, .type-heading {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+h1, .marketing-title { font-size: 56px; }
+.workspace-title { font-size: 32px; }
+
+.brand, .brand-wordmark {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+button, .tabs button, .button, .download {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.6;
+}
+
+.terminal-command {
+  font-family: var(--font-terminal);
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  h1, .marketing-title { font-size: 36px; }
+  .workspace-title { font-size: 32px; }
+}

@@ -4,3 +4,6 @@ docs/licenses/*.txt whitespace=-blank-at-eol
 # Preserve literal patch context and local upstream license variants.
 third-party/ghostty14/*.patch -whitespace
 docs/licenses/ghostty14/*.txt whitespace=-blank-at-eol
+
+# Preserve upstream font license bytes, including original whitespace.
+**/OFL-Pretendard.txt -whitespace

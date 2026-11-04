@@ -1,0 +1,12 @@
+# Local proposal media and rendered evidence; runtime source assets keep their owning policy.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.zip
+*.pptx
+*.ndjson
+*.log
+.DS_Store
+.build/
+node_modules/

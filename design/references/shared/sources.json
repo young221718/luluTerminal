@@ -1,0 +1,22 @@
+[
+  {
+    "source": "design/common/typography/typography.css",
+    "destination": "app/infra-terminal/develop/design/references/shared/typography/typography.css",
+    "sha256": "424410b7caacfdc98120dc047e406076ae173e05a525307a74ebb8592a0ac5de"
+  },
+  {
+    "source": "design/common/typography/fonts/SOURCE.md",
+    "destination": "app/infra-terminal/develop/design/references/shared/typography/fonts/SOURCE.md",
+    "sha256": "32a0bc9f1250bd016096319f0d07f2f0f353565adafc60948a2ddb1879850132"
+  },
+  {
+    "source": "design/common/typography/fonts/PretendardVariable.woff2",
+    "destination": "app/infra-terminal/develop/design/references/shared/typography/fonts/PretendardVariable.woff2",
+    "sha256": "9599f12fd42fc0bce1cd50b47a0c022e108d7aa64dd0d1bb0ed44f3282d900b4"
+  },
+  {
+    "source": "design/common/typography/fonts/OFL-Pretendard.txt",
+    "destination": "app/infra-terminal/develop/design/references/shared/typography/fonts/OFL-Pretendard.txt",
+    "sha256": "d31ddd9f2bed32fd7e302a205cf2380ba0de6529152d239ef99cfb6f261bfc04"
+  }
+]

@@ -15,14 +15,14 @@
 
 - 승인된 정규 표기는 **happylulu / luluTerminal / luluAnnotate**입니다. 이 앱의 표기는 **luluTerminal**이며, 브랜드의 `lulu`는 항상 소문자로 씁니다.
 - 브랜드 문자와 제목은 **Pretendard Variable 700**, 본문은 **400**, 버튼은 **600**으로 통일합니다. 코드와 터미널 명령만 시스템 고정폭 글꼴을 사용합니다.
-- PNG 안에 내장된 이전 대소문자나 글꼴 굵기는 참고 표현입니다. 실제 작업에서는 최신 텍스트 표기와 [공통 글꼴 문서](../../../../../../design/archive/ollulu/app-branding-proposal/TYPOGRAPHY.md), [CSS 기준](../shared/typography/typography.css)을 우선합니다.
+- PNG 안에 내장된 이전 대소문자나 글꼴 굵기는 참고 표현입니다. 실제 작업에서는 최신 텍스트 표기와 [공통 글꼴 문서](../../../../../../design/history/ollulu/app-branding-proposal/TYPOGRAPHY.md), [CSS 기준](../shared/typography/typography.css)을 우선합니다.
 
 ## 공통 원본
 
-같은 로컬 워크스페이스의 [세 앱 브랜딩 제안](../../../../../../design/archive/ollulu/app-branding-proposal/README.md)과 [올루루 디자인 폴더](../../../../../../design/archive/ollulu/README.md)를 함께 참고합니다. 이 저장소를 단독으로 복사하면 공통 폴더 링크는 연결되지 않을 수 있으며, 위 PNG 두 개는 이 폴더에서 독립적으로 열 수 있습니다.
+같은 로컬 워크스페이스의 [세 앱 브랜딩 제안](../../../../../../design/history/ollulu/app-branding-proposal/README.md)과 [올루루 디자인 폴더](../../../../../../design/history/ollulu/README.md)를 함께 참고합니다. 이 저장소를 단독으로 복사하면 공통 폴더 링크는 연결되지 않을 수 있으며, 위 PNG 두 개는 이 폴더에서 독립적으로 열 수 있습니다.
 
 원본 경로: `디자인/올루루/앱-브랜딩-제안/icons/luluterminal.png`, `디자인/올루루/앱-브랜딩-제안/mockups/luluterminal-home.png`.
 
 ## 아이콘 크기와 모서리
 
-현재 PNG는 세 앱 사이의 표시 크기·여백·반지름이 다른 참고 시안입니다. 공통 제작 기준은 1024×1024 캔버스, 상하좌우 64px 여백, 896×896 타일, 모든 모서리 R200입니다. 올루루 원본과 배율·좌표를 동일하게 재사용합니다. [상세 규격과 관찰 결과](../../../../../../design/archive/ollulu/app-branding-proposal/ICON-GEOMETRY.md)를 따릅니다. 이 규격을 적용한 PNG 교체나 실제 앱 적용은 아직 수행하지 않았습니다.
+현재 PNG는 세 앱 사이의 표시 크기·여백·반지름이 다른 참고 시안입니다. 공통 제작 기준은 1024×1024 캔버스, 상하좌우 64px 여백, 896×896 타일, 모든 모서리 R200입니다. 올루루 원본과 배율·좌표를 동일하게 재사용합니다. [상세 규격과 관찰 결과](../../../../../../design/history/ollulu/app-branding-proposal/ICON-GEOMETRY.md)를 따릅니다. 이 규격을 적용한 PNG 교체나 실제 앱 적용은 아직 수행하지 않았습니다.

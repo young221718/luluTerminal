@@ -31,7 +31,7 @@ struct SSHKeySetupView: View {
             Text(request.unlock ? "SSH 키 잠금 해제" : "SSH 키 설정").font(.title2.weight(.semibold))
             if let server = model.workspace.servers.first(where: { $0.id == request.serverID }),
                let account = server.accounts.first(where: { $0.id == request.accountID }) {
-                Text("\(server.name) · \(account.username)@\(server.host):\(server.port)")
+                Text("\(server.name) · \(account.username)@\(server.host):\(String(server.port))")
                     .font(.callout).textSelection(.enabled)
             }
             if request.unlock {

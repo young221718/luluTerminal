@@ -336,7 +336,7 @@ public struct InfraRootView: View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 Text(server.name).font(.system(size: 13, weight: .semibold)).lineLimit(1).layoutPriority(1)
-                Text(server.kind == .local ? "로컬 macOS" : "\(server.host) · SSH \(server.port)")
+                Text(server.kind == .local ? "로컬 macOS" : "\(server.host) · SSH \(String(server.port))")
                     .font(.system(size: 10)).foregroundStyle(appearance.colors.muted).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
             }
             Spacer()
